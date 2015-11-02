@@ -39,6 +39,12 @@ jedi-setup.py is distributed under the GPL.
  mdtraj, numpy
 
 """
+#
+# 02.11.15 FIXME) Add code to customise the created PDB files
+# Need to:
+# - retain original PDB indices. 
+# - replace occupancy column with atomic masses
+#
 import argparse, os,sys, copy
 import mdtraj, numpy
 
@@ -143,7 +149,7 @@ def selectAlignment(frame, rule="backbone"):
     """
     subset = frame.topology.select(rule)
     alignment = frame.atom_slice(subset)
-    return alignment
+    return alignment, subset
 
 def defineGrid( frame, ligand=None, lig_cutoff=5.0, region=None, spacing=0.15):
     """Input: frame: a mdtraj frame
@@ -248,16 +254,53 @@ def selectPolarApolar(frame, grid_min, grid_max):
     #print apolar_list
     polar = system.atom_slice(polar_list)
     apolar = system.atom_slice(apolar_list)
-    return polar, apolar
+    return polar, polar_list, apolar, apolar_list
 
-def outputPdb(frame, outfile="output.pdb"):
+def outputPdb(frame, outfile="output.pdb", indices=None):
     """
     Input: frame: a mdtraj frame
            outfile (optional): the name of the pdb file to write frame to
     """
     frame.save(outfile)
-
-
+    # Not pretty ! Ideally would modify mdtraj's API
+    if indices is not None:
+        rstream = open(outfile)
+        buffer = rstream.readlines()
+        rstream.close()
+        wstream = open('temp.pdb','w')
+        pdb_idx = 0
+        for line in buffer:
+            if line.startswith("ATOM"):
+                new_idx = indices[pdb_idx] + 1 # Because starts at 0
+                mass = frame.topology.atom(pdb_idx).element.mass
+                #print pdb_idx, new_idx, mass
+                if new_idx < 10:
+                    str_idx = '    %s' % new_idx
+                elif new_idx < 100:
+                    str_idx= '   %s' % new_idx
+                elif new_idx < 1000:
+                    str_idx = '  %s' % new_idx
+                elif new_idx < 10000:
+                    str_idx = ' %s' % new_idx
+                else:
+                    str_dix = '%s' % new_idx
+                str_mass = '%-5.2f' % mass
+                new_line = line[0:6] + str_idx + line[11:55] + str_mass + line[60:] 
+                #import pdb; pdb.set_trace()
+                wstream.write(new_line)
+                pdb_idx +=1
+            else:
+                wstream.write(line)
+        wstream.close()
+        cmd = "mv temp.pdb %s" % outfile
+        os.system(cmd)
+        #sys.exit(-1)
+    # If indices is not None
+    # load file
+    # for every ATOM line
+    # update index
+    # also update Occupancy column to have atomic mass
+    
 if __name__ == '__main__':
     print ("*** jedi setup beginning *** ")
     # Parse command line arguments
@@ -277,18 +320,16 @@ if __name__ == '__main__':
     else:
         region = None
     # construct alignment
-    # FIXME HOW TO RETAIN ORIGINAL PDB INDICES ?
-    # FIXME HOW TO PUT ATOMIC MASSES IN OCCUPANCY COLUMN
-    alignment = selectAlignment(system, rule="backbone")
+    alignment, alignment_indices = selectAlignment(system, rule="backbone")
     # construct grid, polar and apolar
     grid_data = defineGrid(system, ligand=ligand, lig_cutoff=lig_cutoff,\
                                region=region, spacing=spacing)
-    # FIXME HOW TO RETAIN ORIGINAL PDB INDICES ?
-    polar, apolar = selectPolarApolar(system, grid_data[1], grid_data[2])
+    polar, polar_indices, apolar, apolar_indices =\
+        selectPolarApolar(system, grid_data[1], grid_data[2])
     #sys.exit(-1)
     # Write output
-    outputPdb(grid_data[0], outfile=grid_pdb)
-    outputPdb(polar, outfile=polar_pdb)
-    outputPdb(apolar, outfile=apolar_pdb)
-    outputPdb(alignment, outfile=alignment_pdb)
+    outputPdb(grid_data[0], outfile=grid_pdb, indices=None)
+    outputPdb(polar, outfile=polar_pdb, indices=polar_indices)
+    outputPdb(apolar, outfile=apolar_pdb, indices=apolar_indices)
+    outputPdb(alignment, outfile=alignment_pdb, indices=alignment_indices)
     print ("*** jedi setup complete *** ")
