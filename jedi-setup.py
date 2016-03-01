@@ -4,7 +4,7 @@
  @AUTHOR Julien Michel. Sep 2015.
  @USAGE
   jedi-setup.py [-h] [-i [INPUT]] [-v] [-l [LIGAND]] [-r [REGION]]
-                     [-a [APOLAR]] [-p [POLAR]] [-n [ALIGNMENT]] [-g [GRID]]
+                     [-a [APOLAR]] [-p [POLAR]] [-g [GRID]]
                      [-c [CUTOFF]] [-s [SPACING]]
 
 Setup input files for a Gromacs/Plumed JEDI calculation.
@@ -22,9 +22,6 @@ optional arguments:
                         name of output apolar atoms file. Default apolar.pdb
   -p [POLAR], --polar [POLAR]
                         name of output polar atoms file. Default polar.pdb
-  -n [ALIGNMENT], --alignment [ALIGNMENT]
-                        name of output alignment atoms file. Default
-                        alignment.pdb
   -g [GRID], --grid [GRID]
                         name of output grid file. Default grid.pdb
   -c [CUTOFF], --cutoff [CUTOFF]
@@ -65,9 +62,6 @@ parser.add_argument('-a','--apolar', nargs="?",
 parser.add_argument('-p','--polar', nargs="?",
                     help="name of output polar atoms file. Default polar.pdb",
                     default="polar.pdb")
-parser.add_argument('-n','--alignment', nargs="?",
-                    help="name of output alignment atoms file. Default alignment.pdb",
-                    default="alignment.pdb")
 parser.add_argument('-g','--grid', nargs="?",
                     help="name of output grid file. Default grid.pdb",
                     default="grid.pdb")
@@ -83,47 +77,47 @@ def parse(parser):
 
     if args.input is None:
         parser.print_help()
-        print """@@@
+        print ("""@@@
 ERROR ! You must specificy an input PDB. See usage above. 
-@@@"""
+@@@""")
         sys.exit(-1)
 
     if not os.path.isfile(args.input):
         parser.print_help()
-        print """@@@
+        print ("""@@@
 ERROR ! The input PDB cannot be found. See usage above.
-@@@"""
+@@@""")
         sys.exit(-1)
 
     # Catch lack of ligand and region file
     if ( (args.ligand is None and args.region is None) or
          (not args.ligand is None and not args.region is None) ):
         parser.print_help()
-        print """@@@
+        print ("""@@@
 ERROR ! You must specify a ligand OR a region file as input.
-@@@"""
+@@@""")
         sys.exit(-1)
 
     # Catch specified but absent ligand file
     if not args.ligand is None and not os.path.isfile(args.ligand):
         parser.print_help()
-        print """@@@
+        print ("""@@@
 ERROR ! The specified input ligand file cannot be found. See usage above.
-@@@"""
+@@@""")
         sys.exit(-1)
 
     # Catch specified but absent region file
     if not args.region is None and not os.path.isfile(args.region):
         parser.print_help()
-        print """@@@
+        print ("""@@@
 ERROR ! The specified input region file cannot be found. See usage above.
-@@@"""
+@@@""")
         sys.exit(-1)
 
 
-    print args
+    print (args)
     return args.input, args.ligand, float(args.cutoff), args.region, float(args.spacing),\
-        args.apolar,args.polar, args.alignment, args.grid
+        args.apolar,args.polar,args.grid
 
 def loadStructure(pdbfile):
     """Input: pdbfile: A pdb file name
@@ -140,16 +134,16 @@ def loadRegion(regionfile):
     """
     return 0
 
-def selectAlignment(frame, rule="backbone"):
-    """Input: frame: a mdtraj frame
-              rule (optional): How to select atoms to retain from frame.
-              rule can be 'backbone' == name C, CA, N, O, HA, H
-              rule can be 'Calpha' == name CA
-              Default is backbone
-    """
-    subset = frame.topology.select(rule)
-    alignment = frame.atom_slice(subset)
-    return alignment, subset
+#def selectAlignment(frame, rule="backbone"):
+#    """Input: frame: a mdtraj frame
+#              rule (optional): How to select atoms to retain from frame.
+#              rule can be 'backbone' == name C, CA, N, O, HA, H
+#              rule can be 'Calpha' == name CA
+#              Default is backbone
+#    """
+#    subset = frame.topology.select(rule)
+#    alignment = frame.atom_slice(subset)
+#    return alignment, subset
 
 def defineGrid( frame, ligand=None, lig_cutoff=5.0, region=None, spacing=0.15):
     """Input: frame: a mdtraj frame
@@ -185,15 +179,15 @@ def defineGrid( frame, ligand=None, lig_cutoff=5.0, region=None, spacing=0.15):
             if atcoord[2] > maxcoords[2]:
                 maxcoords[2] = atcoord[2]
         # Now extend bounding box by lig_cutoff
-        for i in range(0,2):
+        for i in range(0,3):
             mincoords[i] = mincoords[i] - lig_cutoff
             maxcoords[i] = maxcoords[i] + lig_cutoff
     else:
         pass
         #mincoords = region['min']
         #maxcoords = region['max']
-    print ("Mininum grid coordinates: %s " % mincoords)
-    print ("Maximum grid coordinates: %s " % maxcoords)
+    #print ("Mininum grid coordinates: %s " % mincoords)
+    #print ("Maximum grid coordinates: %s " % maxcoords)
     # Populate paralleliped with evenly spaced grid points
     # work out how many N grid points to add
     xstep = int ( (maxcoords[0] - mincoords[0] )/ spacing ) + 1
@@ -300,12 +294,59 @@ def outputPdb(frame, outfile="output.pdb", indices=None):
     # for every ATOM line
     # update index
     # also update Occupancy column to have atomic mass
-    
+
+def centerGrid(grid_data, polar, apolar):
+    # Compute com polar/apolar
+    com = [0.0, 0.0, 0.0]
+    tot_mass = 0.0
+    idx = 0
+    for coords in polar.xyz[0]:
+        mass = polar.topology.atom(idx).element.mass
+        for i in range(0,3):
+            com[i] += coords[i]*mass
+        tot_mass += mass
+        idx += 1
+    idx = 0
+    for coords in apolar.xyz[0]:
+        mass = apolar.topology.atom(idx).element.mass
+        for i in range(0,3):
+            com[i] += coords[i]*mass
+        tot_mass += mass
+        idx += 1
+    for i in range(0,3):
+        com[i] /= tot_mass
+    #print (com)
+    # Compute cog grid
+    cog = [0.0,0.0,0.0]
+    idx = 0
+    for coords in grid_data[0].xyz[0]:
+        for i in range(0,3):
+            cog[i] += coords[i]
+        idx += 1
+    for i in range(0,3):
+        cog[i] /= idx
+    #print (cog)
+    #print (grid_data[0].xyz[0][0])
+    # Update grid coordinates by delta_cog
+    delta_cog = [com[0]-cog[0], com[1]-cog[1], com[2]-cog[2]]
+    #print (delta_cog)
+    #delta_cog = [0.0, 0.0, 0.0]
+
+    idx=0
+    for coords in grid_data[0].xyz[0]:
+        newcoord = coords
+        for i in range(0,3):
+            newcoord[i] = coords[i]+delta_cog[i]
+        grid_data[0].xyz[0][idx] = newcoord
+        idx += 1
+    #print (grid_data[0].xyz[0][0])
+    #import pdb; pdb.set_trace()
+
 if __name__ == '__main__':
     print ("*** jedi setup beginning *** ")
     # Parse command line arguments
     system_pdb, ligand_pdb, lig_cutoff, region_dim, spacing,\
-        apolar_pdb, polar_pdb, alignment_pdb, grid_pdb = parse(parser)
+        apolar_pdb, polar_pdb, grid_pdb = parse(parser)
     # Load protein coordinates
     system = loadStructure(system_pdb)
 
@@ -320,16 +361,18 @@ if __name__ == '__main__':
     else:
         region = None
     # construct alignment
-    alignment, alignment_indices = selectAlignment(system, rule="backbone")
+    #alignment, alignment_indices = selectAlignment(system, rule="backbone")
     # construct grid, polar and apolar
     grid_data = defineGrid(system, ligand=ligand, lig_cutoff=lig_cutoff,\
                                region=region, spacing=spacing)
     polar, polar_indices, apolar, apolar_indices =\
         selectPolarApolar(system, grid_data[1], grid_data[2])
+    # Now center grid on COM of polar+apolar region
+    centerGrid(grid_data, polar, apolar)
     #sys.exit(-1)
     # Write output
     outputPdb(grid_data[0], outfile=grid_pdb, indices=None)
     outputPdb(polar, outfile=polar_pdb, indices=polar_indices)
     outputPdb(apolar, outfile=apolar_pdb, indices=apolar_indices)
-    outputPdb(alignment, outfile=alignment_pdb, indices=alignment_indices)
+    #outputPdb(alignment, outfile=alignment_pdb, indices=alignment_indices)
     print ("*** jedi setup complete *** ")
