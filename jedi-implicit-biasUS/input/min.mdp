@@ -1,0 +1,27 @@
+; minim.mdp - used as input into grompp to generate em.tpr
+integrator	= steep		; Algorithm (steep = steepest descent minimization)
+emtol		= 1000.0  	; Stop minimization when the maximum force < 1000.0 kJ/mol/nm
+emstep          = 0.01          ; Energy step size
+nsteps		= 500	  	; Maximum number of (minimization) steps to perform
+; required cutoffs for implicit
+nstlist = 1
+ns_type = grid
+rlist = 1.0
+rcoulomb = 1.0
+rvdw = 1.0
+; cutoffs required for qq and vdw
+coulombtype = cut-off
+vdwtype = cut-off
+; temperature coupling
+tcoupl = no
+; Pressure coupling is off
+Pcoupl = no
+; Periodic boundary conditions are off for implicit
+pbc = no
+; Settings for implicit solvent
+implicit_solvent = GBSA
+gb_algorithm = OBC
+rgbradii = 1.0
+; default cutoff scheme Verlet lists not supported for implicit solvent
+cutoff-scheme=group
+

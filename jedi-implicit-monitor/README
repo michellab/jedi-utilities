@@ -1,0 +1,8 @@
+This example executes a setup of a jedi calculation using a ligand to position the grid.
+This is followed by an implicit solvent setup.
+The protein is then minimized. 
+The protein is then equilibrated with positional restraints for 2 ps.
+A production run of 2 ps then performed. 
+The JEDI collective variable, grid coordinates and derivatives are computed every 100 steps. 
+The SITE keyword option was used to deactivate grid points that are far away from the SITE pdb file.
+No biasing of the MD simulation is done. 
