@@ -132,7 +132,16 @@ def loadRegion(regionfile):
     Input: regionfile: a file that contains the definiton of a rectangular box
     Output: a datastructure defining the bounding box
     """
-    return 0
+    region={'min':[],'max':[]}
+    filein=open(regionfile,'r')
+    for line in filein:
+        if line.startswith('#') or len(line.split())!=3:
+           continue
+        line=line.split()    
+        region['min'].append(float(line[1]))
+        region['max'].append(float(line[2]))
+    filein.close()
+    return region 
 
 #def selectAlignment(frame, rule="backbone"):
 #    """Input: frame: a mdtraj frame
@@ -183,9 +192,8 @@ def defineGrid( frame, ligand=None, lig_cutoff=5.0, region=None, spacing=0.15):
             mincoords[i] = mincoords[i] - lig_cutoff
             maxcoords[i] = maxcoords[i] + lig_cutoff
     else:
-        pass
-        #mincoords = region['min']
-        #maxcoords = region['max']
+        mincoords = region['min']
+        maxcoords = region['max']
     #print ("Mininum grid coordinates: %s " % mincoords)
     #print ("Maximum grid coordinates: %s " % maxcoords)
     # Populate paralleliped with evenly spaced grid points
@@ -363,6 +371,13 @@ if __name__ == '__main__':
     # construct alignment
     #alignment, alignment_indices = selectAlignment(system, rule="backbone")
     # construct grid, polar and apolar
+    print "System ", system
+    print "ligand ", ligand
+    print "lig_cutoff ", lig_cutoff
+    print "region: ", region, " Type ", type(region)
+    print "spacing ", spacing
+    #sys.exit("This is just a test, modifications done between line 367 and this point")
+    
     grid_data = defineGrid(system, ligand=ligand, lig_cutoff=lig_cutoff,\
                                region=region, spacing=spacing)
     polar, polar_indices, apolar, apolar_indices =\
