@@ -29,6 +29,9 @@ optional arguments:
                         bounding box
   -s [SPACING], --spacing [SPACING]
                         the spacing between neighboring grid points (in nm)
+  -w [yes/no], --ignore_waters [yes/no]
+                        specify if the water molecules have to be ignored
+                        or not. Default is yes.
 
 jedi-setup.py is distributed under the GPL.
 
@@ -71,6 +74,9 @@ parser.add_argument('-c','--cutoff',nargs="?",
 parser.add_argument('-s','--spacing', nargs="?",
                     default="0.15",
                     help="the spacing between neighboring grid points (in nm)")
+parser.add_argument('-w', '--ignore_waters',nargs="?",
+                    default="yes",
+                    help="omit water oxygens in apolar atoms file")
 
 def parse(parser):
     args = parser.parse_args()
@@ -114,16 +120,31 @@ ERROR ! The specified input region file cannot be found. See usage above.
 @@@""")
         sys.exit(-1)
 
+    # Inform the user of whether water oxygens are omitted or not
+    if (args.ignore_waters is None) or (args.ignore_waters == "yes"):
+       print "Water oxygens are going to be ignored"
+    elif args.ignore_waters == "no":
+       print "Water oxygens are NOT going to be ignored"
+    else:
+       print """@@@
+ERROR ! The -w flag can only have "yes" or "no". Default is "yes".
+@@@"""
+       sys.exit(-1)
+
 
     print (args)
     return args.input, args.ligand, float(args.cutoff), args.region, float(args.spacing),\
-        args.apolar,args.polar,args.grid
+        args.apolar,args.polar,args.grid,args.ignore_waters
+
 
 def loadStructure(pdbfile):
     """Input: pdbfile: A pdb file name
     Output: A datastructure that holds a pdb frame
     """
     struc = mdtraj.load(pdbfile)
+    # Remove the water molecules unless the specifies otherwise
+    if wat == 'yes': 
+       struc=struc.remove_solvent()
 
     return struc
 
@@ -354,7 +375,7 @@ if __name__ == '__main__':
     print ("*** jedi setup beginning *** ")
     # Parse command line arguments
     system_pdb, ligand_pdb, lig_cutoff, region_dim, spacing,\
-        apolar_pdb, polar_pdb, grid_pdb = parse(parser)
+        apolar_pdb, polar_pdb, grid_pdb, wat = parse(parser)
     # Load protein coordinates
     system = loadStructure(system_pdb)
 
