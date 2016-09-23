@@ -32,6 +32,9 @@ optional arguments:
   -w [yes/no], --ignore_waters [yes/no]
                         specify if the water molecules have to be ignored
                         or not. Default is yes.
+  -k [yes/no], --crop [yes/no]
+                        delete (or not) the grid points that are farther 
+                        from the ligand than the cutoff. Default is yes.
 
 jedi-setup.py is distributed under the GPL.
 
@@ -45,8 +48,8 @@ jedi-setup.py is distributed under the GPL.
 # - retain original PDB indices. 
 # - replace occupancy column with atomic masses
 #
-import argparse, os,sys, copy
-import mdtraj, numpy
+import argparse, os,sys, copy, math
+import mdtraj, numpy 
 
 parser = argparse.ArgumentParser(description="Setup input files for a Gromacs/Plumed JEDI calculation.",
                                  epilog="jedi-setup.py is distributed under the GPL.",
@@ -77,6 +80,9 @@ parser.add_argument('-s','--spacing', nargs="?",
 parser.add_argument('-w', '--ignore_waters',nargs="?",
                     default="yes",
                     help="omit water oxygens in apolar atoms file")
+parser.add_argument('-k', '--crop',nargs="?",
+                    default="yes",
+                    help="delete grid points that are further from the ligand than the cutoff")
 
 def parse(parser):
     args = parser.parse_args()
@@ -131,10 +137,21 @@ ERROR ! The -w flag can only have "yes" or "no". Default is "yes".
 @@@"""
        sys.exit(-1)
 
+    # Inform the user of whether the grid is going to be cropped or not
+    if (args.crop is None) or (args.crop == "yes"):
+       print "The grid points further than ", args.cutoff, " nm from the ligand are going to be deleted."
+    elif args.crop == "no":
+       print "All grid points are going to be kept."
+    else:
+       print """@@@
+ERROR ! The -k flag can only have "yes" or "no". Default is "yes".
+@@@"""
+       sys.exit(-1)
+
 
     print (args)
     return args.input, args.ligand, float(args.cutoff), args.region, float(args.spacing),\
-        args.apolar,args.polar,args.grid,args.ignore_waters
+        args.apolar,args.polar,args.grid,args.ignore_waters,args.crop
 
 
 def loadStructure(pdbfile):
@@ -222,9 +239,35 @@ def defineGrid( frame, ligand=None, lig_cutoff=5.0, region=None, spacing=0.15):
     xstep = int ( (maxcoords[0] - mincoords[0] )/ spacing ) + 1
     ystep = int ( (maxcoords[1] - mincoords[1] )/ spacing ) + 1
     zstep = int ( (maxcoords[2] - mincoords[2] )/ spacing ) + 1
-    print ("Number of grid points along each axis : %s %s %s " % (xstep,ystep,zstep))
+    print ("Number of grid points along each axis (before cropping): %s %s %s " % (xstep,ystep,zstep))
     Ngrid = xstep*ystep*zstep
-    print ("Total number of grid points: %s " % Ngrid)
+    print ("Total number of grid points (before cropping): %s " % Ngrid)
+    
+    # Generate a list of coordinates of grid points
+    coords = []
+    for i in range(0,xstep):
+        for j in range(0,ystep):
+            for k in range(0,zstep):
+                c_x = mincoords[0] + i * spacing
+                c_y = mincoords[1] + j * spacing
+                c_z = mincoords[2] + k * spacing
+                coords.append( [ c_x, c_y, c_z ] )
+    
+    # Delete (if required) the grid points that are too far from the ligand
+    if (ligand is not None) and (crop=='yes'):
+       cropcoords=[]
+       for gridpoint in coords:
+           for atom in ligand.xyz[0]:
+               distance=math.sqrt((atom[0]-gridpoint[0])**2+\
+                                  (atom[1]-gridpoint[1])**2+\
+                                  (atom[2]-gridpoint[2])**2)
+               if distance<=lig_cutoff:
+                  cropcoords.append(gridpoint)
+                  break
+       coords=cropcoords    
+       Ngrid=len(coords)
+       print ("Total number of grid points (after cropping): %s " % Ngrid)
+
     top = mdtraj.Topology()
     # build one mdtraj.topology.chain
     chain = top.add_chain()
@@ -235,20 +278,12 @@ def defineGrid( frame, ligand=None, lig_cutoff=5.0, region=None, spacing=0.15):
     for i in range(0,Ngrid):
         top.add_atom("GRI", germanium, residue)
     # Loop over every atom in the topology and create a xyz np array
-    coords = []
-    for i in range(0,xstep):
-        for j in range(0,ystep):
-            for k in range(0,zstep):
-                c_x = mincoords[0] + i * spacing
-                c_y = mincoords[1] + j * spacing
-                c_z = mincoords[2] + k * spacing
-                coords.append( [ c_x, c_y, c_z ] )
     xyz = numpy.array(coords)#, dfloat=float32)
     # Find a way to build a mdtraj.traj from top + xyz
     grid = mdtraj.Trajectory(xyz, top)
     return grid, mincoords, maxcoords
 
-def selectPolarApolar(frame, grid_min, grid_max):
+def selectPolarApolar(frame, grid_min, grid_max, ligand=None):
     """Input: frame: a mdtraj frame
               grid_min: minimum grid coordinates
               grid_max: maximim grid coordinates
@@ -269,10 +304,22 @@ def selectPolarApolar(frame, grid_min, grid_max):
             atcoord[1] < grid_max[1] and
             atcoord[2] > grid_min[2] and 
             atcoord[2] < grid_max[2] ):
-            if frame.topology.atom(i).element.symbol in ['N','O']:
-                polar_list.append(i)
-            elif frame.topology.atom(i).element.symbol in ['C','S']:
-                apolar_list.append(i)
+            if (ligand is not None) and (crop=='yes'): # Crop the apolar and polar files if requested
+               for ligatom in ligand.xyz[0]:
+                   distance=math.sqrt((ligatom[0]-atcoord[0])**2+\
+                                      (ligatom[1]-atcoord[1])**2+\
+                                      (ligatom[2]-atcoord[2])**2)
+                   if distance<=lig_cutoff:
+                       if frame.topology.atom(i).element.symbol in ['N','O']:
+                          polar_list.append(i)
+                       elif frame.topology.atom(i).element.symbol in ['C','S']:
+                          apolar_list.append(i)
+                       break
+            else:
+               if frame.topology.atom(i).element.symbol in ['N','O']:
+                   polar_list.append(i)
+               elif frame.topology.atom(i).element.symbol in ['C','S']:
+                   apolar_list.append(i)
     #print polar_list
     #print apolar_list
     polar = system.atom_slice(polar_list)
@@ -375,7 +422,7 @@ if __name__ == '__main__':
     print ("*** jedi setup beginning *** ")
     # Parse command line arguments
     system_pdb, ligand_pdb, lig_cutoff, region_dim, spacing,\
-        apolar_pdb, polar_pdb, grid_pdb, wat = parse(parser)
+        apolar_pdb, polar_pdb, grid_pdb, wat, crop = parse(parser)
     # Load protein coordinates
     system = loadStructure(system_pdb)
 
@@ -402,7 +449,7 @@ if __name__ == '__main__':
     grid_data = defineGrid(system, ligand=ligand, lig_cutoff=lig_cutoff,\
                                region=region, spacing=spacing)
     polar, polar_indices, apolar, apolar_indices =\
-        selectPolarApolar(system, grid_data[1], grid_data[2])
+        selectPolarApolar(system, grid_data[1], grid_data[2],ligand)
     # Now center grid on COM of polar+apolar region
     centerGrid(grid_data, polar, apolar)
     #sys.exit(-1)
