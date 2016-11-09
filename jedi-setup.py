@@ -353,12 +353,13 @@ def outputPdb(frame, outfile="output.pdb", indices=None):
                 elif new_idx < 10000:
                     str_idx = ' %s' % new_idx
                 else:
-                    str_dix = '%s' % new_idx
+                    str_idx = '%s' % new_idx
                 str_mass = '%-5.2f' % mass
                 new_line = line[0:6] + str_idx + line[11:55] + str_mass + line[60:] 
                 #import pdb; pdb.set_trace()
                 wstream.write(new_line)
                 pdb_idx +=1
+                #print "replaced index ",pdb_idx," with ", str_idx
             else:
                 wstream.write(line)
         wstream.close()
