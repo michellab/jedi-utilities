@@ -1,0 +1,42 @@
+title		= NVT equilibration 
+define		= -DPOSRES	; position restrain the protein
+; Run parameters
+integrator	= md		; leap-frog integrator
+nsteps		= 0      	; 2 * 1000 = 2 ps
+dt		= 0.002		; 2 fs
+; Output control
+nstxtcout       = 1             ;
+nstxout		= 0		; save coordinates every 1.0 ps
+nstvout		= 0		; save velocities every 1.0 ps
+nstfout         = 1             ;
+nstenergy	= 1		; save energies every 1.0 ps
+nstlog		= 1		; update log file every 1.0 ps
+; Bond parameters
+continuation	        = no		; first dynamics run
+constraint_algorithm    = lincs	    ; holonomic constraints 
+constraints	        = all-bonds	; all bonds (even heavy atom-H bonds) constrained
+lincs_iter	        = 1		    ; accuracy of LINCS
+lincs_order	        = 4		    ; also related to accuracy
+; required cutoffs for implicit
+nstlist = 10
+ns_type = grid
+rlist = 1.0
+rcoulomb = 1.0
+rvdw = 1.0
+; cutoffs required for qq and vdw
+coulombtype = cut-off
+vdwtype = cut-off
+; Pressure coupling is off
+Pcoupl = no
+; Generate velocities is on
+gen_vel = yes
+gen_temp = 310
+gen_seed = 1234567
+; Periodic boundary conditions are off for implicit
+pbc = no
+; Settings for implicit solvent
+implicit_solvent = GBSA
+gb_algorithm = OBC
+rgbradii = 1.0
+; default cutoff scheme Verlet lists not supported for implicit solvent
+cutoff-scheme=group
