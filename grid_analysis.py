@@ -1,3 +1,30 @@
+#!/usr/bin/env python
+#
+help_message=\
+""" 
+ @AUTHOR Joan Clark-Nicolas. May 2017.
+ @USAGE  python grid_analysis.py jedi-setup.py [-h] [-i [grid xyz input]] [-a [activities txt input]] 
+                                               [-o [grid pdb output]]
+       
+Generate a PDB file of the JEDI grid with the activities of the grid points as occupancy.
+
+optional arguments:
+  -h, --help            Show this help message and exit. 
+  -i [INPUT], --input_grid [INPUT]
+                        Name of input xyz grid file.
+  -a [INPUT], --input_activities [INPUT]
+                        Name of input txt activities file
+  -o [OUTPUT], '--output_grid [OUTPUT]
+                        Name of output pdb grid file. The occupancy column has been replaced with the activities.
+  -k [yes/no], --crop [yes/no]
+                        delete (or not) the grid points that have null activity. Default is yes.
+grid_analysis.py is distributed under the GPL.
+
+ @DEPENDENCIES:
+ mdtraj, numpy
+
+"""
+
 import argparse, os,sys, copy, math
 import mdtraj, numpy
 
@@ -15,29 +42,29 @@ parser.add_argument('-k', '--crop',nargs="?",
 
 def parse(parser):
      args = parser.parse_args()
+
      if args.input_grid is None:
-        parser.print_help()
         print ("""@@@
 ERROR ! You must specificy an xyz grid file and an input_activities file. See usage above. 
 @@@""")
         sys.exit(0)
 
      if not os.path.isfile(args.input_grid):
-        parser.print_help()
+        print help_message
         print ("""@@@
 ERROR ! The input grid xyz file cannot be found. See usage above.
 @@@""")
         sys.exit(-1)
 
      if not os.path.isfile(args.input_activities):
-        parser.print_help()
+        print help_message
         print ("""@@@
 ERROR ! The input_activities file cannot be found. See usage above.
 @@@""")
         sys.exit(-1)
 
      if args.output_grid is None:
-        parser.print_help()
+        print help_message
         print ("""@@@
 ERROR ! Grid output file must be specified. See usage above.
 @@@""")
@@ -97,6 +124,8 @@ def outputPdb(grid_object,activities,output_grid):
         if line.startswith('ATOM'):
            pdb_index=int(line.split()[1])
            activities_index=pdb_index-1 # indices in pdb files start at 1
+           if activities[activities_index]==0 and crop=='yes':
+              continue
            activity_pdb='{0:.2f}'.format(activities[activities_index]) #Occuppancies in pdb files only have 2 decimals
            new_line=line[0:56]+str(activity_pdb)+line[60:]
            outfile.write(new_line)
@@ -106,7 +135,7 @@ def outputPdb(grid_object,activities,output_grid):
     return 0
 
 if __name__ == '__main__':
-   
+   print help_message 
    input_grid,input_activities,output_grid,crop=parse(parser)
    coords,num_points=getGridCoordinates(input_grid)
    activities=getActivities(input_activities)
