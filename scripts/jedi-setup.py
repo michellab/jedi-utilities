@@ -33,7 +33,7 @@ optional arguments:
                         specify if the water molecules have to be ignored
                         or not. Default is yes.
   -k [yes/no], --crop [yes/no]
-                        delete (or not) the grid points that are farther 
+                        delete (or not) the grid points that are further 
                         from the ligand than the cutoff. Default is yes.
 
 jedi-setup.py is distributed under the GPL.
@@ -83,6 +83,9 @@ parser.add_argument('-w', '--ignore_waters',nargs="?",
 parser.add_argument('-k', '--crop',nargs="?",
                     default="yes",
                     help="delete grid points that are further from the ligand than the cutoff")
+parser.add_argument('-f', '--full',nargs="?",
+                    default="no",
+                    help="Generate a grid that overlaps the whole protein")
 
 def parse(parser):
     args = parser.parse_args()
@@ -101,9 +104,9 @@ ERROR ! The input PDB cannot be found. See usage above.
 @@@""")
         sys.exit(-1)
 
-    # Catch lack of ligand and region file
+    # Catch lack of ligand and region file if the -f/--full flag is not present
     if ( (args.ligand is None and args.region is None) or
-         (not args.ligand is None and not args.region is None) ):
+         (not args.ligand is None and not args.region is None) ) and (args.full=="no"):
         parser.print_help()
         print ("""@@@
 ERROR ! You must specify a ligand OR a region file as input.
@@ -138,20 +141,25 @@ ERROR ! The -w flag can only have "yes" or "no". Default is "yes".
        sys.exit(-1)
 
     # Inform the user of whether the grid is going to be cropped or not
-    if (args.crop is None) or (args.crop == "yes"):
+    if ((args.crop is None) or (args.crop == "yes")) and (args.full=="no"):
        print "The grid points further than ", args.cutoff, " nm from the ligand are going to be deleted."
-    elif args.crop == "no":
+    elif (args.crop == "no") and (args.full=="no"):
        print "All grid points are going to be kept."
+    elif args.full=="yes":
+       print "Overlapping a grid onto the whole protein"
     else:
        print """@@@
 ERROR ! The -k flag can only have "yes" or "no". Default is "yes".
 @@@"""
        sys.exit(-1)
 
+    if args.full=="yes":
+       print "The grid is going to overlap the whole protein"
+
 
     print (args)
     return args.input, args.ligand, float(args.cutoff), args.region, float(args.spacing),\
-        args.apolar,args.polar,args.grid,args.ignore_waters,args.crop
+        args.apolar,args.polar,args.grid,args.ignore_waters,args.crop,args.full
 
 
 def loadStructure(pdbfile):
@@ -192,7 +200,7 @@ def loadRegion(regionfile):
 #    alignment = frame.atom_slice(subset)
 #    return alignment, subset
 
-def defineGrid( frame, ligand=None, lig_cutoff=5.0, region=None, spacing=0.15):
+def defineGrid(frame, full, ligand=None, lig_cutoff=5.0, region=None, spacing=0.15):
     """Input: frame: a mdtraj frame
               ligand (optional): a mdtraj frame with ligand coordinates
               lig_cutoff (optional): the maximal distance between ligand
@@ -209,10 +217,33 @@ def defineGrid( frame, ligand=None, lig_cutoff=5.0, region=None, spacing=0.15):
     #
     mincoords = [99999.0, 99999.0, 99999.0]
     maxcoords = [-99999.0, -99999.0, -99999.0]
-    if ligand is not None:
-        for i in range(0,ligand.n_atoms):
-            atcoord = ligand.xyz[0][i]
-            #print (atcoord)
+    if full=="no":
+        if ligand is not None:
+            for i in range(0,ligand.n_atoms):
+                atcoord = ligand.xyz[0][i]
+                #print (atcoord)
+                if atcoord[0] < mincoords[0]:
+                    mincoords[0] = atcoord[0]
+                if atcoord[1] < mincoords[1]:
+                    mincoords[1] = atcoord[1]
+                if atcoord[2] < mincoords[2]:
+                    mincoords[2] = atcoord[2]
+                if atcoord[0] > maxcoords[0]:
+                    maxcoords[0] = atcoord[0]
+                if atcoord[1] > maxcoords[1]:
+                    maxcoords[1] = atcoord[1]
+                if atcoord[2] > maxcoords[2]:
+                    maxcoords[2] = atcoord[2]
+            # Now extend bounding box by lig_cutoff
+            for i in range(0,3):
+                mincoords[i] = mincoords[i] - lig_cutoff
+                maxcoords[i] = maxcoords[i] + lig_cutoff
+        else:
+            mincoords = region['min']
+            maxcoords = region['max']
+    elif full=="yes":
+        for i in range(0,frame.n_atoms):
+            atcoord=frame.xyz[0][i]
             if atcoord[0] < mincoords[0]:
                 mincoords[0] = atcoord[0]
             if atcoord[1] < mincoords[1]:
@@ -225,13 +256,11 @@ def defineGrid( frame, ligand=None, lig_cutoff=5.0, region=None, spacing=0.15):
                 maxcoords[1] = atcoord[1]
             if atcoord[2] > maxcoords[2]:
                 maxcoords[2] = atcoord[2]
-        # Now extend bounding box by lig_cutoff
-        for i in range(0,3):
-            mincoords[i] = mincoords[i] - lig_cutoff
-            maxcoords[i] = maxcoords[i] + lig_cutoff
-    else:
-        mincoords = region['min']
-        maxcoords = region['max']
+        # extending the grid by 0.3 nm so it extends a bit from the protein
+        for i in range(0,3): 
+            mincoords[i] = mincoords[i] - 0.3 
+            maxcoords[i] = maxcoords[i] + 0.3
+
     #print ("Mininum grid coordinates: %s " % mincoords)
     #print ("Maximum grid coordinates: %s " % maxcoords)
     # Populate paralleliped with evenly spaced grid points
@@ -267,6 +296,21 @@ def defineGrid( frame, ligand=None, lig_cutoff=5.0, region=None, spacing=0.15):
        coords=cropcoords    
        Ngrid=len(coords)
        print ("Total number of grid points (after cropping): %s " % Ngrid)
+
+    elif (full=="yes"):
+       cropcoords=[]
+       for gridpoint in coords:
+           for atom in frame.xyz[0]:
+               distance=math.sqrt((atom[0]-gridpoint[0])**2+\
+                                  (atom[1]-gridpoint[1])**2+\
+                                  (atom[2]-gridpoint[2])**2)
+               if distance<=0.3:
+                  cropcoords.append(gridpoint)
+                  break
+       coords=cropcoords
+       Ngrid=len(coords)
+       print ("Total number of grid points (after cropping): %s " % Ngrid)
+
 
     top = mdtraj.Topology()
     # build one mdtraj.topology.chain
@@ -423,32 +467,39 @@ if __name__ == '__main__':
     print ("*** jedi setup beginning *** ")
     # Parse command line arguments
     system_pdb, ligand_pdb, lig_cutoff, region_dim, spacing,\
-        apolar_pdb, polar_pdb, grid_pdb, wat, crop = parse(parser)
+        apolar_pdb, polar_pdb, grid_pdb, wat, crop, full = parse(parser)
     # Load protein coordinates
     system = loadStructure(system_pdb)
 
-    # Load ligand coordinates/region definition
-    if ligand_pdb is not None:
-        ligand = loadStructure(ligand_pdb)
-    else:
-        ligand = None
+    # Load ligand coordinates/region definition if necessary
+    if full=="no":
+        if ligand_pdb is not None:
+            ligand = loadStructure(ligand_pdb)
+        else:
+            ligand = None
 
-    if region_dim is not None:
-        region = loadRegion(region_dim)
+        if region_dim is not None:
+            region = loadRegion(region_dim)
+        else:
+            region = None
+    elif full=="yes":
+        ligand=None
+        region=None
     else:
-        region = None
+        print "Something went wrong. Check the code."
+        sys.exit()
     # construct alignment
     #alignment, alignment_indices = selectAlignment(system, rule="backbone")
     # construct grid, polar and apolar
     print "System ", system
-    print "ligand ", ligand
-    print "lig_cutoff ", lig_cutoff
-    print "region: ", region, " Type ", type(region)
+    if full=="no":
+       print "ligand ", ligand
+       print "lig_cutoff ", lig_cutoff
+       print "region: ", region, " Type ", type(region)
     print "spacing ", spacing
     #sys.exit("This is just a test, modifications done between line 367 and this point")
-    
-    grid_data = defineGrid(system, ligand=ligand, lig_cutoff=lig_cutoff,\
-                               region=region, spacing=spacing)
+    grid_data = defineGrid(system,full,ligand=ligand, lig_cutoff=lig_cutoff,\
+                                   region=region, spacing=spacing)
     polar, polar_indices, apolar, apolar_indices =\
         selectPolarApolar(system, grid_data[1], grid_data[2],ligand)
     # Now center grid on COM of polar+apolar region
