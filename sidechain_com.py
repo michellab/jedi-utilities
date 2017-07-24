@@ -1,4 +1,4 @@
-import argparse
+import argparse,numpy,os
 
 parser = argparse.ArgumentParser(description="Takes a protein binding site and generates a \
                                               PLUMED input to calculate the COM of each side\
@@ -19,11 +19,14 @@ parser.add_argument('-o','--output', nargs="?",
 parser.add_argument('-s','--stride', nargs="?",
                     help='PLUMED printing stride',
                     default='1')
+parser.add_argument('-t','--trr', nargs="?",
+                    help='gromacs trr trajectory to process with PLUMED driver')
+
 
 
 def parse(parser):
     args = parser.parse_args()
-    return args.apolar,args.polar,args.input,args.output,args.stride
+    return args.apolar,args.polar,args.input,args.output,args.stride,args.trr
 
 
 
@@ -85,14 +88,47 @@ def genPlumedinput(sideChains,output,stride):
     fileout.write(line)    
     
     fileout.close()
+
+def Clustering(trr,output):
+    command='plumed driver --mf_trr '+trr+' --plumed '+output
+    os.system(command)
+   
+    # Get values from PLUMED output
+    filein=open('COMCOLVAR','r')
+    keys=[]
+    dists={}
+    for line in filein:
+        if line.startswith('#'):
+           line=line.split()
+           for key in line:
+               if key.startswith('#'):
+                  continue
+               else:
+                  keys.append(key)
+                  dists[key]=[]
+        else:
+           line=line.split()
+           print len(line), len(keys)
+           for i in range(0, len(line)):
+               dists[keys[i]].append(float(line[i]))
+    filein.close()
+    
+    fileout=open('test.dat','w')
+    ## PRINT ALL THE VALUES IN A FILE THAT CAN BE ANALYSED BY DCLUSTER ##
+
+    print dists.keys()
+    print "there are ", len(dists.keys()), "values in dists.keys() and ", len(keys), "values in keys"
+ 
         
 
 if __name__=='__main__':
     
-    apolar,polar,structure,output,stride = parse(parser)
+    apolar,polar,structure,output,stride,trr = parse(parser)
     
     residues = findResidues(apolar,polar)
     
     sideChains = findSideChains(structure,residues)
 
     genPlumedinput(sideChains,output,stride)
+
+    Clustering(trr,output)
