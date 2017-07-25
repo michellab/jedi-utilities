@@ -1,4 +1,4 @@
-import argparse,numpy,os
+import argparse,numpy,os,scipy
 
 parser = argparse.ArgumentParser(description="Takes a protein binding site and generates a \
                                               PLUMED input to calculate the COM of each side\
@@ -17,11 +17,10 @@ parser.add_argument('-o','--output', nargs="?",
                     help='Name of the input file to supply to PLUMED',
                     default='com.dat')
 parser.add_argument('-s','--stride', nargs="?",
-                    help='PLUMED printing stride',
+                    help='PLUMED printing stride in ps (not timesteps!!)',
                     default='1')
 parser.add_argument('-t','--trr', nargs="?",
                     help='gromacs trr trajectory to process with PLUMED driver')
-
 
 
 def parse(parser):
@@ -30,7 +29,7 @@ def parse(parser):
 
 
 
-def findResidues(apolar,polar):
+def findResidues(apolar,polar): # Change this function to do it with mdtraj
     residues=[]
     for pdb in [apolar,polar]:
         filein=open(pdb,'r')
@@ -43,7 +42,7 @@ def findResidues(apolar,polar):
     print "There are", len(residues), "residues" 
     return residues
 
-def findSideChains(structure,residues):
+def findSideChains(structure,residues): #change this function to do it with mdtraj
     filein=open(structure,'r')
     backbone=['CA','C','O','N']
     SOLIONS=['SOL','WAT','HOH','NA','CL']
@@ -84,42 +83,98 @@ def genPlumedinput(sideChains,output,stride):
                labels_dist.append(label)
     print "there are ",len(labels_dist), "distances to print"
 
-    line='PRINT ARG='+','.join(labels_dist)+' STRIDE='+stride+' FILE=COMCOLVAR'
+    line='PRINT ARG='+','.join(labels_dist)+' STRIDE=1 FILE=COMCOLVAR'
     fileout.write(line)    
     
     fileout.close()
 
-def Clustering(trr,output):
+def Plumed(trr,output,stride):
     command='plumed driver --mf_trr '+trr+' --plumed '+output
     os.system(command)
    
     # Get values from PLUMED output
+    time=[]
+    values=[]
     filein=open('COMCOLVAR','r')
-    keys=[]
-    dists={}
     for line in filein:
-        if line.startswith('#'):
-           line=line.split()
-           for key in line:
-               if key.startswith('#'):
-                  continue
-               else:
-                  keys.append(key)
-                  dists[key]=[]
+        line=line.split()
+        if line[0]=='#!':
+           labels=line[3:]
         else:
-           line=line.split()
-           print len(line), len(keys)
-           for i in range(0, len(line)):
-               dists[keys[i]].append(float(line[i]))
-    filein.close()
-    
-    fileout=open('test.dat','w')
-    ## PRINT ALL THE VALUES IN A FILE THAT CAN BE ANALYSED BY DCLUSTER ##
+           time.append(float(line[0])*float(stride))
+           values.append(map(float,line[1:]))
+    values=numpy.array(values)
+    return labels, time, values
 
-    print dists.keys()
-    print "there are ", len(dists.keys()), "values in dists.keys() and ", len(keys), "values in keys"
- 
-        
+
+
+def Clustering(labels,time,values): # Done as in Rodriguez & Laio, Science(2014),344,6191,1492-1496 :
+    
+   #calculate euclidean distances:
+    euclidMat=[]
+    for i in range (0,len(values)):
+        euclid=[]
+        for j in range(0,len(values)):
+            if i==j:
+               euclid.append(99999999.)
+            elif j>i:
+               euclid.append(numpy.linalg.norm(values[i]-values[j]))
+            elif j<i:
+               euclid.append(99999999.)
+        euclidMat.append(euclid)
+    euclidMat=numpy.array(euclidMat)
+    #print euclidMat
+         
+    
+    #calculte rho for each data point
+    d0=2. #This value needs to be calculated somehow!!!
+    rho=[]
+    for i in range(0,len(values)):
+        rhoi=0.
+        for j in range(0,len(values)):
+            if j==i:
+               continue
+            elif j>i:
+               #print j, i
+               if euclidMat[i][j]<d0:
+                  rhoi=rhoi+1
+            elif j<i:
+               if euclidMat[j][i]<d0:
+                  rhoi=rhoi+1
+        rho.append(rhoi)
+    #print rho
+    
+    #calculate delta for each data point:
+    delta=[]
+    for i in range(0,len(values)):
+        deltai=999999999.
+        for j in range(0,len(values)):
+            if j==i:
+               continue
+            elif j>i:
+               if (rho[j]>rho[i]) and (euclidMat[i][j]<deltai):
+                  deltai=euclidMat[i][j]
+            elif j<i:
+               if (rho[j]>rho[i]) and (euclidMat[j][i]<deltai):
+                  deltai=euclidMat[j][i]
+        delta.append(deltai)
+    
+    # correct maximum element. This is done different than in the paper!!!!!
+    deltai=0.
+    for i in range(0,len(delta)):
+        if delta[i]!=999999999. and delta[i]>deltai:
+           deltai=delta[i]
+    for i in range(0,len(delta)):
+        if delta[i]==999999999.:
+           delta[i]=deltai
+
+    fileout=open('rhodelta.txt','w')
+    for i in range(1,len(values)):
+        line=str(time[i])+' '+str(rho[i])+' '+str(delta[i])+'\n'
+        fileout.write(line)
+    fileout.close()
+
+    print max(delta)
 
 if __name__=='__main__':
     
@@ -131,4 +186,7 @@ if __name__=='__main__':
 
     genPlumedinput(sideChains,output,stride)
 
-    Clustering(trr,output)
+    labels,time,values=Plumed(trr,output,stride)
+
+    Clustering(labels,time,values)
+    
