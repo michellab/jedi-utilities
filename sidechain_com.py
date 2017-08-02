@@ -1,4 +1,4 @@
-import argparse,numpy,os,mdtraj
+import argparse,numpy,os,mdtraj,scipy.stats,sys
 
 parser = argparse.ArgumentParser(description="Takes a protein binding site and generates a \
                                               PLUMED input to calculate the COM of each side\
@@ -23,11 +23,13 @@ parser.add_argument('-t','--trr', nargs="?",
                     help='gromacs trr trajectory to process with PLUMED driver')
 parser.add_argument('-g','--gro', nargs="?",
                     help='Name of input GRO file.')
+parser.add_argument('-d','--dat', nargs="?",
+                    help='Name of PLUMED input DAT file.')
 
 
 def parse(parser):
     args = parser.parse_args()
-    return args.apolar,args.polar,args.input,args.output,args.stride,args.trr,args.gro
+    return args.apolar,args.polar,args.input,args.output,args.stride,args.trr,args.gro,args.dat
 
 
 
@@ -97,6 +99,7 @@ def Plumed(trr,output,stride):
     # Get values from PLUMED output
     time=[]
     values=[]
+    print "calculating euclidean distances"
     filein=open('COMCOLVAR','r')
     for line in filein:
         line=line.split()
@@ -114,7 +117,7 @@ def Clustering(labels,time,values): # Done as in Rodriguez & Laio, Science(2014)
     
    #calculate euclidean distances:
     euclidMat=[]
-    euclidMat_avg=[]
+    euclidMat_stats=[]
     for i in range (0,len(values)):
         euclid=[]
         for j in range(0,len(values)):
@@ -122,16 +125,17 @@ def Clustering(labels,time,values): # Done as in Rodriguez & Laio, Science(2014)
                euclid.append(99999999.)
             elif j>i:
                euclid.append(numpy.linalg.norm(values[i]-values[j]))
-               euclidMat_avg.append(numpy.linalg.norm(values[i]-values[j]))
+               euclidMat_stats.append(numpy.linalg.norm(values[i]-values[j]))
             elif j<i:
                euclid.append(99999999.)
         euclidMat.append(euclid)
     euclidMat=numpy.array(euclidMat)
     #print euclidMat
-    euclidMat_avg=numpy.mean(euclidMat_avg)
+    euclidMat_avg=numpy.mean(euclidMat_stats)
+    euclidMat_sd=numpy.std(euclidMat_stats)
     
     #calculte rho for each data point
-    d0=euclidMat_avg/2 #This parameter needs to be optimised for each system and CV  
+    d0=euclidMat_avg/2  
     rho=[]
     for i in range(0,len(values)):
         rhoi=0.
@@ -180,10 +184,21 @@ def Clustering(labels,time,values): # Done as in Rodriguez & Laio, Science(2014)
         line=str(time[i])+' '+str(rho[i])+' '+str(delta[i])+'\n'
         fileout.write(line)
     fileout.close()
-
+    
+    Nclust=0
+    delta_avg=numpy.mean(delta)
+    delta_sd=numpy.std(delta)
+    dnorm=0.99999
+    for deltai in delta:
+        delta_norm=scipy.stats.norm(loc=delta_avg,scale=delta_sd).cdf(deltai)
+        if delta_norm > dnorm:
+           Nclust+=1
+    print "found", Nclust, "cluster centers. exiting"
 
     # Select number of clusters by visual inspection and assign centers
-    Nclust=int(raw_input("Plot the rhodelta file and tell me how many cluster centers you observe:\n"))
+    #Nclust=int(raw_input("Plot the rhodelta file and tell me how many cluster centers you observe:\n"))
+
+    
    
     deltaCenters=sorted(delta,reverse=True)[0:Nclust]
 
@@ -219,11 +234,12 @@ def Clustering(labels,time,values): # Done as in Rodriguez & Laio, Science(2014)
         print "cluster with center at ", center, "picoseconds has ", len(clusters[center]), "elements"
         totalElements=totalElements+len(clusters[center])
     print "Total elements clustered:", totalElements, ". Number of observations: ",len(values)," (MUST BE THE SAME)"
-   
+    print "Number of clusters: ", Nclust
     return clusters
 
 def genRefs(gro,trr,apolar,polar,clusters):
 
+    refs=[]
     name=trr.split('.')[0]
 
     traj=mdtraj.load_trr(trr, top=gro)
@@ -242,10 +258,12 @@ def genRefs(gro,trr,apolar,polar,clusters):
         
     for key in clusters.keys():
         outfile='ref_'+name+'_'+str(int(key))+'.pdb'
+        snapfile='snap_'+name+'_'+str(int(key))+'.pdb'
         framenumber=time.index(key)
         coords=traj.xyz[framenumber]
         top=traj.topology
         frame=mdtraj.Trajectory(coords,top)
+        frame.save_pdb(snapfile)
         ref=frame.atom_slice(reflist)
         ref.save_pdb('temp.pdb')
     #    sys.exit()
@@ -273,8 +291,52 @@ def genRefs(gro,trr,apolar,polar,clusters):
                idx=idx+1
             fileout.write(line)
         filein.close()
-        fileout.close()     
+        fileout.close()
         os.system('rm temp.pdb')
+        refs.append(outfile)
+    return refs
+
+def plumeDatGenerator(dat,refs):
+    iteration=refs[0].split('_')[1] 
+    labels=[]
+    nameOut=iteration+'.dat'
+    
+    fileout=open(nameOut,'w')
+    for namepdb in refs:
+        time_str=namepdb.split('_')[2].split('.')[0]
+        label='rmsd_'+iteration+'_'+time_str
+        labels.append(label)
+        line=label+': RMSD REFERENCE='+namepdb+' TYPE=OPTIMAL\n LOWER_WALLS ARG='+label+' AT=1.0 KAPPA=500\n'
+        fileout.write(line)
+    fileout.close()
+
+    filein=open(dat,'r')
+    fileout=open('temp.dat','w')
+    for line in filein:
+        if line.startswith('PRINT'):
+           lineprint=line
+        else:
+           fileout.write(line)
+ 
+    include_str='INCLUDE FILE='+nameOut+'\n'
+    fileout.write(include_str)
+
+    newLinePrint=''
+    for element in lineprint.split():
+        if element=='PRINT':
+           newLinePrint=newLinePrint+element
+        elif element.startswith('STRIDE') or element.startswith('FILE'):
+           newLinePrint=newLinePrint+' '+element
+        elif element.startswith('ARG'):
+           for label in labels:
+               element=element+','+label
+           newLinePrint=newLinePrint+' '+element
+    fileout.write(newLinePrint)
+    fileout.close()
+    command = 'mv temp.dat '+dat
+    os.system(command)
+
+   
             
 
 
@@ -282,7 +344,7 @@ def genRefs(gro,trr,apolar,polar,clusters):
 
 if __name__=='__main__':
     
-    apolar,polar,structure,output,stride,trr,gro = parse(parser)
+    apolar,polar,structure,output,stride,trr,gro,dat = parse(parser)
     
     residues = findResidues(apolar,polar)
     
@@ -294,6 +356,6 @@ if __name__=='__main__':
 
     clusters=Clustering(labels,time,values)
     
-    genRefs(gro,trr,apolar,polar,clusters)
+    refs=genRefs(gro,trr,apolar,polar,clusters)
     
-    
+    plumeDatGenerator(dat,refs)
