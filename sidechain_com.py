@@ -33,46 +33,32 @@ def parse(parser):
 
 
 
-def findResidues(apolar,polar): # Change this function to do it with mdtraj
-    residues=[]
+def findResidues(apolar,polar): 
+    residues_str=[]
     for pdb in [apolar,polar]:
-        filein=open(pdb,'r')
-        for line in filein:
-            if line.startswith("ATOM") or line.startswith ("HETATM"):
-               line=line.split()
-               if line[5] not in residues:
-                  residues.append(line[5])
-        filein.close()
-    print "There are", len(residues), "residues" 
-    return residues
+        structure=mdtraj.load_pdb(pdb)
+        for res in structure.topology.residues:
+            if str(res) not in residues_str and "GLY" not in str(res):
+               residues_str.append(str(res))
+    print "There are", len(residues_str), "residues" 
+    return residues_str
 
 def findSideChains(structure,residues): #change this function to do it with mdtraj
-    filein=open(structure,'r')
-    backbone=['CA','C','O','N']
-    SOLIONS=['SOL','WAT','HOH','NA','CL']
+    struct=mdtraj.load_pdb(structure)
     sideChains={}
-    currentResidue='NONE'
-    for line in filein:
-        if line.startswith("ATOM") or line.startswith ("HETATM"):
-           line=line.split()
-           if line[3] in SOLIONS:
-              break
-           if line[5] not in residues:
-              continue
-           else:
-               if line[5]!=currentResidue:
-                  currentResidue=line[5]
-                  sideChains[currentResidue]=[]
-               if line[2] not in backbone: # Add something to keep hydrogens out
-                  sideChains[currentResidue].append(line[1])
-    filein.close()
+    for res in struct.topology.residues:
+        if str(res) in residues:
+           sideChains[str(res)]=[]
+           for atom in res.atoms:
+               if atom.is_sidechain==True and str(atom.element) is not "hydrogen":
+                  sideChains[str(res)].append(str(atom.serial))
     return sideChains
 
 def genPlumedinput(sideChains,output,stride):
     fileout=open(output,'w')
     labels_com=[]
     for key in sideChains.keys():
-        label='com'+key
+        label=key
         line=label+': COM ATOMS='+','.join(sideChains[key])+'\n'
         fileout.write(line)
         labels_com.append(label)
@@ -81,7 +67,7 @@ def genPlumedinput(sideChains,output,stride):
     for i in range(0,len(labels_com)):
         for j in range(i,len(labels_com)):
             if j!=i:
-               label='dist'+labels_com[i]+labels_com[j]
+               label=labels_com[i]+'_'+labels_com[j]
                line=label+': DISTANCE ATOMS='+labels_com[i]+','+labels_com[j]+'\n'
                fileout.write(line)
                labels_dist.append(label)
@@ -188,12 +174,11 @@ def Clustering(labels,time,values): # Done as in Rodriguez & Laio, Science(2014)
     Nclust=0
     delta_avg=numpy.mean(delta)
     delta_sd=numpy.std(delta)
-    dnorm=0.99999
+    dnorm=0.999999
     for deltai in delta:
         delta_norm=scipy.stats.norm(loc=delta_avg,scale=delta_sd).cdf(deltai)
         if delta_norm > dnorm:
            Nclust+=1
-    print "found", Nclust, "cluster centers. exiting"
 
     # Select number of clusters by visual inspection and assign centers
     #Nclust=int(raw_input("Plot the rhodelta file and tell me how many cluster centers you observe:\n"))
