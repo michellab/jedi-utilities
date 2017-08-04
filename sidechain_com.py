@@ -25,11 +25,14 @@ parser.add_argument('-g','--gro', nargs="?",
                     help='Name of input GRO file.')
 parser.add_argument('-d','--dat', nargs="?",
                     help='Name of PLUMED input DAT file.')
-
+parser.add_argument('-r','--rmsd', nargs="?",
+                    help='target RMSD value')
+parser.add_argument('-k','--kappa', nargs="?",
+                    help='force constant for the harmonic bias')
 
 def parse(parser):
     args = parser.parse_args()
-    return args.apolar,args.polar,args.input,args.output,args.stride,args.trr,args.gro,args.dat
+    return args.apolar,args.polar,args.input,args.output,args.stride,args.trr,args.gro,args.dat,args.rmsd,args.kappa
 
 
 
@@ -281,7 +284,7 @@ def genRefs(gro,trr,apolar,polar,clusters):
         refs.append(outfile)
     return refs
 
-def plumeDatGenerator(dat,refs):
+def plumeDatGenerator(dat,refs,rmsd,kappa):
     iteration=refs[0].split('_')[1] 
     labels=[]
     nameOut=iteration+'.dat'
@@ -291,7 +294,7 @@ def plumeDatGenerator(dat,refs):
         time_str=namepdb.split('_')[2].split('.')[0]
         label='rmsd_'+iteration+'_'+time_str
         labels.append(label)
-        line=label+': RMSD REFERENCE='+namepdb+' TYPE=OPTIMAL\n LOWER_WALLS ARG='+label+' AT=1.0 KAPPA=500\n'
+        line=label+': RMSD REFERENCE='+namepdb+' TYPE=OPTIMAL\n LOWER_WALLS ARG='+label+' AT='+rmsd+' KAPPA='+kappa+'\n'
         fileout.write(line)
     fileout.close()
 
@@ -329,7 +332,7 @@ def plumeDatGenerator(dat,refs):
 
 if __name__=='__main__':
     
-    apolar,polar,structure,output,stride,trr,gro,dat = parse(parser)
+    apolar,polar,structure,output,stride,trr,gro,dat,rmsd,kappa = parse(parser)
     
     residues = findResidues(apolar,polar)
     
@@ -343,4 +346,4 @@ if __name__=='__main__':
     
     refs=genRefs(gro,trr,apolar,polar,clusters)
     
-    plumeDatGenerator(dat,refs)
+    plumeDatGenerator(dat,refs,rmsd,kappa)
