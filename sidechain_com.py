@@ -29,10 +29,11 @@ parser.add_argument('-r','--rmsd', nargs="?",
                     help='target RMSD value')
 parser.add_argument('-k','--kappa', nargs="?",
                     help='force constant for the harmonic bias')
-
+parser.add_argument('-m','--metric',nargs='?',
+                    help="metric used to cluster points")
 def parse(parser):
     args = parser.parse_args()
-    return args.apolar,args.polar,args.input,args.output,args.stride,args.trr,args.gro,args.dat,args.rmsd,args.kappa
+    return args.apolar,args.polar,args.input,args.output,args.stride,args.trr,args.gro,args.dat,args.rmsd,args.kappa,args.metric
 
 
 
@@ -48,33 +49,72 @@ def findResidues(apolar,polar):
 
 def findSideChains(structure,residues): #change this function to do it with mdtraj
     struct=mdtraj.load_pdb(structure)
-    sideChains={}
-    for res in struct.topology.residues:
-        if str(res) in residues:
-           sideChains[str(res)]=[]
-           for atom in res.atoms:
-               if atom.is_sidechain==True and str(atom.element) is not "hydrogen":
-                  sideChains[str(res)].append(str(atom.serial))
-    return sideChains
+
+    if metric == "COM":
+        sideChains={}
+        for res in struct.topology.residues:
+            if str(res) in residues:
+               sideChains[str(res)]=[]
+               for atom in res.atoms:
+                   if atom.is_sidechain==True and str(atom.element) is not "hydrogen":
+                      sideChains[str(res)].append(str(atom.serial))
+        return sideChains
+
+    elif metric == "TORSION":
+         chi={}
+         for i in range(0,len(md.compute_chi1(traj)[0])):
+             name='chi1_'+str(i)
+             atoms=[]
+             for atom in md.compute_chi1(traj)[0][i]:
+                 atoms.append(str(atom))
+             chi[name]=atoms
+        
+         for i in range(0,len(md.compute_chi2(traj)[0])):
+             name='chi2_'+str(i)
+             atoms=[]
+             for atom in md.compute_chi2(traj)[0][i]:
+                 atoms.append(str(atom))
+             chi[name]=atoms
+
+         for i in range(0,len(md.compute_chi3(traj)[0])):
+             name='chi3_'+str(i)
+             atoms=[]
+             for atom in md.compute_chi3(traj)[0][i]:
+                 atoms.append(str(atom))
+             chi[name]=atoms
+
+         for i in range(0,len(md.compute_chi4(traj)[0])):
+             name='chi4_'+str(i)
+             atoms=[]
+             for atom in md.compute_chi4(traj)[0][i]:
+                 atoms.append(str(atom))
+             chi[name]=atoms
+
+         print chi
+         sys.exit()  
 
 def genPlumedinput(sideChains,output,stride):
     fileout=open(output,'w')
-    labels_com=[]
-    for key in sideChains.keys():
-        label=key
-        line=label+': COM ATOMS='+','.join(sideChains[key])+'\n'
-        fileout.write(line)
-        labels_com.append(label)
+    if metric == "COM":
+        labels_com=[]
+        for key in sideChains.keys():
+            label=key
+            line=label+': COM ATOMS='+','.join(sideChains[key])+'\n'
+            fileout.write(line)
+            labels_com.append(label)
     
-    labels_dist=[]
-    for i in range(0,len(labels_com)):
-        for j in range(i,len(labels_com)):
-            if j!=i:
-               label=labels_com[i]+'_'+labels_com[j]
-               line=label+': DISTANCE ATOMS='+labels_com[i]+','+labels_com[j]+'\n'
-               fileout.write(line)
-               labels_dist.append(label)
-    print "there are ",len(labels_dist), "distances to print"
+        labels_dist=[]
+        for i in range(0,len(labels_com)):
+            for j in range(i,len(labels_com)):
+                if j!=i:
+                   label=labels_com[i]+'_'+labels_com[j]
+                   line=label+': DISTANCE ATOMS='+labels_com[i]+','+labels_com[j]+'\n'
+                   fileout.write(line)
+                   labels_dist.append(label)
+        print "there are ",len(labels_dist), "distances to print"
+
+    elif metric == "TORSION":
+         # WORK OUT IF THERE ARE TORSIONS TO PLAY WITH AND HOW TO PRINT THEM
 
     line='PRINT ARG='+','.join(labels_dist)+' STRIDE=1 FILE=COMCOLVAR'
     fileout.write(line)    
