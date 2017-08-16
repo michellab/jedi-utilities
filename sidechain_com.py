@@ -47,7 +47,7 @@ def findResidues(apolar,polar):
     print "There are", len(residues_str), "residues" 
     return residues_str
 
-def findSideChains(structure,residues): #change this function to do it with mdtraj
+def findAtomGroups(structure,residues): #change this function to do it with mdtraj
     struct=mdtraj.load_pdb(structure)
 
     if metric == "COM":
@@ -61,45 +61,44 @@ def findSideChains(structure,residues): #change this function to do it with mdtr
         return sideChains
 
     elif metric == "TORSION":
-         chi={}
-         for i in range(0,len(md.compute_chi1(traj)[0])):
-             name='chi1_'+str(i)
-             atoms=[]
-             for atom in md.compute_chi1(traj)[0][i]:
-                 atoms.append(str(atom))
-             chi[name]=atoms
-        
-         for i in range(0,len(md.compute_chi2(traj)[0])):
-             name='chi2_'+str(i)
-             atoms=[]
-             for atom in md.compute_chi2(traj)[0][i]:
-                 atoms.append(str(atom))
-             chi[name]=atoms
+        chi={}
+        for i in range(0,len(mdtraj.compute_chi1(struct)[0])):
+            name='chi1_'+str(i)
+            atoms=[]
+            for atom in mdtraj.compute_chi1(struct)[0][i]:
+                atoms.append(str(atom))
+            chi[name]=atoms
+       
+        for i in range(0,len(mdtraj.compute_chi2(struct)[0])):
+            name='chi2_'+str(i)
+            atoms=[]
+            for atom in mdtraj.compute_chi2(struct)[0][i]:
+                atoms.append(str(atom))
+            chi[name]=atoms
 
-         for i in range(0,len(md.compute_chi3(traj)[0])):
-             name='chi3_'+str(i)
-             atoms=[]
-             for atom in md.compute_chi3(traj)[0][i]:
-                 atoms.append(str(atom))
-             chi[name]=atoms
+        for i in range(0,len(mdtraj.compute_chi3(struct)[0])):
+            name='chi3_'+str(i)
+            atoms=[]
+            for atom in mdtraj.compute_chi3(struct)[0][i]:
+                atoms.append(str(atom))
+            chi[name]=atoms
 
-         for i in range(0,len(md.compute_chi4(traj)[0])):
-             name='chi4_'+str(i)
-             atoms=[]
-             for atom in md.compute_chi4(traj)[0][i]:
-                 atoms.append(str(atom))
-             chi[name]=atoms
+        for i in range(0,len(mdtraj.compute_chi4(struct)[0])):
+            name='chi4_'+str(i)
+            atoms=[]
+            for atom in mdtraj.compute_chi4(struct)[0][i]:
+                atoms.append(str(atom))
+            chi[name]=atoms
 
-         print chi
-         sys.exit()  
-
-def genPlumedinput(sideChains,output,stride):
+        return chi
+ 
+def genPlumedinput(atomGroups,output,stride):
     fileout=open(output,'w')
     if metric == "COM":
         labels_com=[]
-        for key in sideChains.keys():
+        for key in atomGroups.keys():
             label=key
-            line=label+': COM ATOMS='+','.join(sideChains[key])+'\n'
+            line=label+': COM ATOMS='+','.join(atomGroups[key])+'\n'
             fileout.write(line)
             labels_com.append(label)
     
@@ -114,6 +113,16 @@ def genPlumedinput(sideChains,output,stride):
         print "there are ",len(labels_dist), "distances to print"
 
     elif metric == "TORSION":
+        labels_tor=[]
+        for key in atomGroups.keys():
+            label=key
+            line=label+': TORSION ATOMS='+','.join(atomGroups[key])+'\n'
+            fileout.write(line)
+            labels_tor.append(label)
+
+        labels_dist=labels_tor
+        print "there are ",len(labels_dist), "distances to print"
+
          # WORK OUT IF THERE ARE TORSIONS TO PLAY WITH AND HOW TO PRINT THEM
 
     line='PRINT ARG='+','.join(labels_dist)+' STRIDE=1 FILE=COMCOLVAR'
@@ -128,16 +137,20 @@ def Plumed(trr,output,stride):
     # Get values from PLUMED output
     time=[]
     values=[]
-    print "calculating euclidean distances"
+    print "Putting values into vectors"
     filein=open('COMCOLVAR','r')
     for line in filein:
         line=line.split()
-        if line[0]=='#!':
+        if (line[0]=='#!'): 
+           if 'SET' in line:
+               continue
            labels=line[3:]
         else:
            time.append(float(line[0])*float(stride))
            values.append(map(float,line[1:]))
     values=numpy.array(values)
+    print values
+    #sys.exit()
     return labels, time, values
 
 
@@ -145,6 +158,7 @@ def Plumed(trr,output,stride):
 def Clustering(labels,time,values): # Done as in Rodriguez & Laio, Science(2014),344,6191,1492-1496 :
     
    #calculate euclidean distances:
+    print "Calculating euclidean distances"
     euclidMat=[]
     euclidMat_stats=[]
     for i in range (0,len(values)):
@@ -159,12 +173,19 @@ def Clustering(labels,time,values): # Done as in Rodriguez & Laio, Science(2014)
                euclid.append(99999999.)
         euclidMat.append(euclid)
     euclidMat=numpy.array(euclidMat)
-    #print euclidMat
+    print euclidMat
     euclidMat_avg=numpy.mean(euclidMat_stats)
     euclidMat_sd=numpy.std(euclidMat_stats)
+
+
+    print "euclidMat_avg = ", euclidMat_avg
+    print "euclidMat_sd = ", euclidMat_sd
     
     #calculte rho for each data point
-    d0=euclidMat_avg/2  
+    if metric == "COM":
+       d0=euclidMat_avg/2
+    elif metric == "TORSION":
+       d0=euclidMat_avg-2*euclidMat_sd
     rho=[]
     for i in range(0,len(values)):
         rhoi=0.
@@ -213,11 +234,15 @@ def Clustering(labels,time,values): # Done as in Rodriguez & Laio, Science(2014)
         line=str(time[i])+' '+str(rho[i])+' '+str(delta[i])+'\n'
         fileout.write(line)
     fileout.close()
-    
+
     Nclust=0
     delta_avg=numpy.mean(delta)
     delta_sd=numpy.std(delta)
-    dnorm=0.999999
+    if metric == "COM":
+       dnorm=0.999999
+    elif metric == "TORSION"
+       dnorm=0.999
+
     for deltai in delta:
         delta_norm=scipy.stats.norm(loc=delta_avg,scale=delta_sd).cdf(deltai)
         if delta_norm > dnorm:
@@ -235,7 +260,8 @@ def Clustering(labels,time,values): # Done as in Rodriguez & Laio, Science(2014)
         if delta[i] in deltaCenters:
            clusterCenters.append(i)
     print "Found",len(clusterCenters), "cluster centers"
-    
+    sys.exit()
+
     clusters={}
     for center in clusterCenters:
         print "Found center", center, "at time=", time[center], "picoseconds."
@@ -372,13 +398,13 @@ def plumeDatGenerator(dat,refs,rmsd,kappa):
 
 if __name__=='__main__':
     
-    apolar,polar,structure,output,stride,trr,gro,dat,rmsd,kappa = parse(parser)
+    apolar,polar,structure,output,stride,trr,gro,dat,rmsd,kappa,metric = parse(parser)
     
     residues = findResidues(apolar,polar)
     
-    sideChains = findSideChains(structure,residues)
+    atomGroups = findAtomGroups(structure,residues)
 
-    genPlumedinput(sideChains,output,stride)
+    genPlumedinput(atomGroups,output,stride)
 
     labels,time,values=Plumed(trr,output,stride)
 
