@@ -239,8 +239,8 @@ def Clustering(labels,time,values): # Done as in Rodriguez & Laio, Science(2014)
     delta_avg=numpy.mean(delta)
     delta_sd=numpy.std(delta)
     if metric == "COM":
-       dnorm=0.999999
-    elif metric == "TORSION"
+       dnorm=0.999
+    elif metric == "TORSION":
        dnorm=0.999
 
     for deltai in delta:
