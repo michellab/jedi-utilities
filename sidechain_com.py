@@ -260,7 +260,6 @@ def Clustering(labels,time,values): # Done as in Rodriguez & Laio, Science(2014)
         if delta[i] in deltaCenters:
            clusterCenters.append(i)
     print "Found",len(clusterCenters), "cluster centers"
-    sys.exit()
 
     clusters={}
     for center in clusterCenters:
@@ -284,9 +283,19 @@ def Clustering(labels,time,values): # Done as in Rodriguez & Laio, Science(2014)
     
     #check how many elements are in each cluster
     totalElements=0
+    clusters_forward={}
     for center in clusters.keys():
-        print "cluster with center at ", center, "picoseconds has ", len(clusters[center]), "elements"
+        fraction=float(len(clusters[center]))/float(len(values))
+        print fraction
+        if fraction >= 0.05:
+           print "Cluster with center at ", center, "picoseconds has ", len(clusters[center]), "elements. --SAVED"
+           clusters_forward[center]=clusters[center]
+        else:
+           print "Cluster with center at ", center, "picoseconds has ", len(clusters[center]), "elements. --DISCARDED"
+        
         totalElements=totalElements+len(clusters[center])
+    clusters=clusters_forward
+    Nclust=len(clusters.keys())
     print "Total elements clustered:", totalElements, ". Number of observations: ",len(values)," (MUST BE THE SAME)"
     print "Number of clusters: ", Nclust
     return clusters
