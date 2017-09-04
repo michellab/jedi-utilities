@@ -1,4 +1,4 @@
-import argparse,numpy,os,mdtraj,scipy.stats,sys
+import argparse,numpy,os,mdtraj,scipy.stats,sys,math
 
 parser = argparse.ArgumentParser(description="Takes a protein binding site and generates a \
                                               PLUMED input to calculate the COM of each side\
@@ -31,9 +31,21 @@ parser.add_argument('-k','--kappa', nargs="?",
                     help='force constant for the harmonic bias')
 parser.add_argument('-m','--metric',nargs='?',
                     help="metric used to cluster points")
+parser.add_argument('-l','--ligands',nargs='?',
+                    help="ist of PDBQT files containing ligands to dock (using Autodock Vina).\
+                          have to be between quotes and separated by a space")
+parser.add_argument('-z','--outliers',nargs='?',
+                    help="number of requested outliers to restart simulations from")
+parser.add_argument('-y','--tpr',nargs='?',
+                    help="tpr file for trjconv")
+parser.add_argument('-x','--nocentrr',nargs='?',
+                    help="trr file for trjconv (the one uncentered and with waters)")
+
 def parse(parser):
     args = parser.parse_args()
-    return args.apolar,args.polar,args.input,args.output,args.stride,args.trr,args.gro,args.dat,args.rmsd,args.kappa,args.metric
+    ligands=args.ligands.split()
+    outliers=int(args.outliers)
+    return args.apolar,args.polar,args.input,args.output,args.stride,args.trr,args.gro,args.dat,args.rmsd,args.kappa,args.metric,ligands,outliers,args.tpr,args.nocentrr
 
 
 
@@ -147,7 +159,14 @@ def Plumed(trr,output,stride):
            labels=line[3:]
         else:
            time.append(float(line[0])*float(stride))
-           values.append(map(float,line[1:]))
+           valuesline=[]
+           for i in range(1,len(line)):
+               tor=float(line[i])
+               costor=math.cos(tor) # ask Joan why both sin AND cos
+               sintor=math.sin(tor)
+               valuesline.append(costor)
+               valuesline.append(sintor)
+           values.append(numpy.array(valuesline))
     values=numpy.array(values)
     print values
     #sys.exit()
@@ -155,7 +174,7 @@ def Plumed(trr,output,stride):
 
 
 
-def Clustering(labels,time,values): # Done as in Rodriguez & Laio, Science(2014),344,6191,1492-1496 :
+def Clustering(labels,time,values,outliers): # Done as in Rodriguez & Laio, Science(2014),344,6191,1492-1496 :
     
    #calculate euclidean distances:
     print "Calculating euclidean distances"
@@ -235,6 +254,8 @@ def Clustering(labels,time,values): # Done as in Rodriguez & Laio, Science(2014)
         fileout.write(line)
     fileout.close()
 
+    '''
+    #FIXME: SELECT NUMBER OF SNAPSHOTS MANUALLY DEPENDING ON HOW MANY OUTLIERS YOU WANT
     Nclust=0
     delta_avg=numpy.mean(delta)
     delta_sd=numpy.std(delta)
@@ -249,57 +270,79 @@ def Clustering(labels,time,values): # Done as in Rodriguez & Laio, Science(2014)
            Nclust+=1
 
     # Select number of clusters by visual inspection and assign centers
-    #Nclust=int(raw_input("Plot the rhodelta file and tell me how many cluster centers you observe:\n"))
+    #Nclust=int(raw_input("Plot the rhodelta file and tell me how many cluster centers you observe:\n")
+    ''' 
+    Nclust=1
+    Noutli=0
+ 
+    while Noutli<outliers:
 
+        deltaCenters=sorted(delta,reverse=True)[0:Nclust]
+        
+        print "Starting iteration ", Nclust 
+
+        clusterCenters=[]
+        for i in range(0,len(values)):
+            if delta[i] in deltaCenters:
+               clusterCenters.append(i)
+        print "Found",len(clusterCenters), "cluster centers"
+
+        clusters={}
+        for center in clusterCenters:
+            print "Found center", center, "at time=", time[center], "picoseconds."
+            clusters[time[center]]=[]
     
-   
-    deltaCenters=sorted(delta,reverse=True)[0:Nclust]
-
-    clusterCenters=[]
-    for i in range(0,len(values)):
-        if delta[i] in deltaCenters:
-           clusterCenters.append(i)
-    print "Found",len(clusterCenters), "cluster centers"
-
-    clusters={}
-    for center in clusterCenters:
-        print "Found center", center, "at time=", time[center], "picoseconds."
-        clusters[time[center]]=[]
-    
-    # Assign each point to the cluster corresponding to the closest cluster center
-    for i in range(0,len(values)):
-        disti=[]
-        for j in clusterCenters:
-            if j==i:
-                disti.append(0.)
-            elif j>i:
-               disti.append(euclidMat[i][j])
-            elif j<i:
-               disti.append(euclidMat[j][i])
-        mindisti=min(disti)
-        jmindist=disti.index(min(disti))
-        center=clusterCenters[jmindist]
-        clusters[time[center]].append(time[i])
+        # Assign each point to the cluster corresponding to the closest cluster center
+        for i in range(0,len(values)):
+            disti=[]
+            for j in clusterCenters:
+                if j==i:
+                   disti.append(0.)
+                elif j>i:
+                   disti.append(euclidMat[i][j])
+                elif j<i:
+                   disti.append(euclidMat[j][i])
+            mindisti=min(disti)
+            jmindist=disti.index(min(disti))
+            center=clusterCenters[jmindist]
+            clusters[time[center]].append(time[i])
     
     #check how many elements are in each cluster
-    totalElements=0
-    clusters_forward={}
-    for center in clusters.keys():
-        fraction=float(len(clusters[center]))/float(len(values))
-        print fraction
-        if fraction >= 0.05:
-           print "Cluster with center at ", center, "picoseconds has ", len(clusters[center]), "elements. --SAVED"
-           clusters_forward[center]=clusters[center]
-        else:
-           print "Cluster with center at ", center, "picoseconds has ", len(clusters[center]), "elements. --DISCARDED"
+        totalElements=0
+        clusters_forward={}
+        outliers_forward={}
+        for center in clusters.keys():
+            fraction=float(len(clusters[center]))/float(len(values))
+            print fraction
+            if fraction >= 0.05:
+               print "Cluster with center at ", center, "picoseconds has ", len(clusters[center]), "elements. --CLUSTER"
+               clusters_forward[center]=clusters[center]
+            else:
+               print "Cluster with center at ", center, "picoseconds has ", len(clusters[center]), "elements. --OUTLIER"
+               outliers_forward[center]=clusters[center]
         
-        totalElements=totalElements+len(clusters[center])
-    clusters=clusters_forward
-    Nclust=len(clusters.keys())
-    print "Total elements clustered:", totalElements, ". Number of observations: ",len(values)," (MUST BE THE SAME)"
-    print "Number of clusters: ", Nclust
-    return clusters
+            totalElements=totalElements+len(clusters[center])
+        NClust=len(clusters_forward.keys())
+        Noutli=len(outliers_forward.keys())
+        print "Total elements clustered:", totalElements, ". Number of observations: ",len(values)," (MUST BE THE SAME)"
+        print "Number of clusters: ", NClust
+        print "Bumber of outliers: ", Noutli
+        print "---------------------------------------------------------"
+        
+        Nclust=Nclust+1
+#    print clusters_forward    
+#    sys.exit()
+    return clusters_forward,outliers_forward
 
+def genTPR(restarters,nocentrr,tpr):
+    
+    times=restarters.keys()
+    count=0
+    for time in times:
+        command = "gmx trjconv -f "+nocentrr+" -s "+tpr+" -b "+str(time)+" -e "+str(time)+" -o restart"+str(count)+".gro << EOF\n 0\n EOF"
+        os.system(command)
+        count=count+1
+    sys.exit()   
 def genRefs(gro,trr,apolar,polar,clusters):
 
     refs=[]
@@ -399,15 +442,59 @@ def plumeDatGenerator(dat,refs,rmsd,kappa):
     command = 'mv temp.dat '+dat
     os.system(command)
 
-   
+def call_vina(refs,ligands):
+    for ligand in ligands:
+        for ref in refs:
+            #1. Prepare receptor pdbqt files
+            #ref=ref.replace('ref','snap') #buggy
+            refqt=ref+'qt'
+            command='babel -ipdb '+ref+' -opdbqt temp.pdbqt'
+            os.system(command)
+            command='grep ATOM temp.pdbqt > '+refqt
+            os.system(command)
+            os.system('rm temp.pdbqt')
             
+            #2. Get vina input file (needs to be checked!!!!!!)
+            frame=mdtraj.load_pdb(ref)
+            center_x=10*numpy.mean(frame.xyz[0],axis=0)[0]
+            center_y=10*numpy.mean(frame.xyz[0],axis=0)[1]
+            center_z=10*numpy.mean(frame.xyz[0],axis=0)[2]
+            size_x=10*abs(numpy.max(frame.xyz[0],axis=0)[0])
+            size_y=10*abs(numpy.max(frame.xyz[0],axis=0)[1])
+            size_z=10*abs(numpy.max(frame.xyz[0],axis=0)[2])
+            fileout=open('vina.txt','w')
+            string='receptor = '+refqt+'\n'+\
+                   'ligand = '+ligand+'\n'\
+                   'center_x = '+str(center_x)+'\n'+\
+                   'center_y = '+str(center_y)+'\n'+\
+                   'center_z = '+str(center_z)+'\n'+\
+                   'size_x = '+str(size_x)+'\n'+\
+                   'size_y = '+str(size_y)+'\n'+\
+                   'size_z = '+str(size_z)+'\n'+\
+                   'num_modes = 25'+'\n'+\
+                   'exhaustiveness = 16'+'\n'+\
+                   'log = log_vina.txt'
+            fileout.write(string)
+            fileout.close()
+            #3. Run vina
+            command='vina --config vina.txt'
+            os.system(command)
+            #4. Classify files
+            site=ref.split('.')[0]
+            lig=ligand.split('.')[0]
+            command='mkdir docking_'+site+'_'+lig
+            os.system(command)
+            command='mv ref*pdbqt *out.pdbqt vina.txt log_vina.txt docking_'+site+'_'+lig # at some point,  change ref for snap
+            os.system(command)
+            
+       
 
 
 
 
 if __name__=='__main__':
     
-    apolar,polar,structure,output,stride,trr,gro,dat,rmsd,kappa,metric = parse(parser)
+    apolar,polar,structure,output,stride,trr,gro,dat,rmsd,kappa,metric,ligands,outliers,tpr,nocentrr = parse(parser)
     
     residues = findResidues(apolar,polar)
     
@@ -417,8 +504,12 @@ if __name__=='__main__':
 
     labels,time,values=Plumed(trr,output,stride)
 
-    clusters=Clustering(labels,time,values)
+    clusters,restarters=Clustering(labels,time,values,outliers)
+
+    tpr=genTPR(restarters,nocentrr,tpr)
     
     refs=genRefs(gro,trr,apolar,polar,clusters)
     
     plumeDatGenerator(dat,refs,rmsd,kappa)
+   
+    call_vina(refs,ligands)
