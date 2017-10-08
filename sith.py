@@ -11,7 +11,7 @@ import glob, os, sys
 
 # In[2]:
 
-os.chdir('/home/joan/PhD/year_2/hPNMT/1HNN/testpy')
+os.chdir('/home/joan/PhD/year_2/hPNMT/MD/1HNN_apo/taboo/')
 
 
 # In[3]:
@@ -82,9 +82,12 @@ def monitor_metric_plumedat(atomGroups,target,iteration,replica,torsions_target,
         sys.exit("COM bias is not implemented yet")
         return 0
     elif metric=='TORSION':
-        plumedPrintFile='colvar_torsions.dat.'+str(iteration)+'.'+str(replica)
-        nameOut='torsion_monitor.dat.'+str(iteration)+'.'+str(replica)
+        plumedPrintFile='colvar_torsions.dat.'+str(iteration)#+'.'+str(replica)
+        jePrintFile='JEDI.'+str(iteration) 
+        nameOut='torsion_monitor.dat.'+str(iteration)#+'.'+str(replica)
         fileout=open(nameOut,'w')
+        line='je: JEDI APOLAR='+apolar+' POLAR='+polar+' GRID='+grid+' PARAMETERS=jedi.params'+' STRIDE=1 SUMMARY=jedi_stats.dat.'+str(iteration)+'.'+str(replica)+' GRIDSTRIDE='+str(stride)+'\n'
+        fileout.write(line)
         printarg=[]
         for key in atomGroups.keys():
             line=key+': TORSION ATOMS='+','.join(atomGroups[key])+'\n'
@@ -95,7 +98,9 @@ def monitor_metric_plumedat(atomGroups,target,iteration,replica,torsions_target,
             line='cos_'+key+': MATHEVAL ARG='+key+' FUNC=cos(x) PERIODIC=NO'+'\n'
             fileout.write(line)
             printarg.append('cos_'+key)
-        line='PRINT ARG='+','.join(printarg)+' STRIDE='+str(stride)+' FILE='+plumedPrintFile
+        line='PRINT ARG='+','.join(printarg)+' STRIDE=1 FILE='+plumedPrintFile+'\n'
+        fileout.write(line)
+        line='PRINT ARG=je STRIDE=1 FILE=JEDI.'+str(iteration)#+'.'+str(replica)+'\n'
         fileout.write(line)
         fileout.close()
         if (target is not None) and (torsions_target is None) and (labels is None):
@@ -107,7 +112,7 @@ def monitor_metric_plumedat(atomGroups,target,iteration,replica,torsions_target,
                 sys.exit('The target has to be in either pdb or gro format')
             print(torsions_target_cmd)
             os.system(torsions_target_cmd)
-            cmd='mv '+plumedPrintFile+' torsions_target.dat'
+            cmd='mv '+plumedPrintFile+' torsions_target.dat && mv '+jePrintFile+' je_target.dat'
             os.system(cmd)
             filein=open('torsions_target.dat','r')
             for line in filein:
@@ -132,10 +137,10 @@ def jedi_taboo_plumedat(monitor_cv,iteration,replica,apolar,polar,grid,stride,ka
         fileout.write(line)
         line='resje: LOWER_WALLS ARG=je AT='+str(at)+' KAPPA='+str(kappa)+' STRIDE='+str(mts)+'\n'
         fileout.write(line)
-        line='INCLUDE FILE='+monitor_cv+'\n'
-        fileout.write(line)
-        line='PRINT ARG=je STRIDE='+str(stride)+' FILE=JEDI.'+str(iteration)+'.'+str(replica)
-        fileout.write(line)
+        #line='INCLUDE FILE='+monitor_cv+'\n'
+        #fileout.write(line)
+        #line='PRINT ARG=je STRIDE='+str(stride)+' FILE=JEDI.'+str(iteration)+'.'+str(replica)
+        #fileout.write(line)
         fileout.close()
     else:
         nameOut='jedi_taboo.'+str(iteration)+'.'+str(replica)+'.dat'
@@ -144,10 +149,10 @@ def jedi_taboo_plumedat(monitor_cv,iteration,replica,apolar,polar,grid,stride,ka
         fileout.write(line)
         line='resje: LOWER_WALLS ARG=je AT='+str(at)+' KAPPA='+str(kappa)+' STRIDE='+str(mts)+'\n'
         fileout.write(line)
-        line='INCLUDE FILE='+monitor_cv+'\n'
-        fileout.write(line)
-        line='PRINT ARG=je STRIDE='+str(stride)+' FILE=JEDI.'+str(iteration)+'.'+str(replica)+'\n'
-        fileout.write(line)
+        #line='INCLUDE FILE='+monitor_cv+'\n'
+        #fileout.write(line)
+        #line='PRINT ARG=je STRIDE='+str(stride)+' FILE=JEDI.'+str(iteration)+'.'+str(replica)+'\n'
+        #fileout.write(line)
         for bias in include:
             line='INCLUDE FILE='+bias+'\n'
             fileout.write(line)
@@ -199,7 +204,7 @@ def analysis_output(colvar_je,colvar_tor,residues,torsions_target,strideps):
 
 # In[8]:
 
-def Clustering(time,values):
+def Clustering(time,values,iteration):
     #calculate euclidean distances:
     print "Calculating euclidean distances"
     euclidMat=[]
@@ -228,7 +233,7 @@ def Clustering(time,values):
     if metric == "COM":
        d0=euclidMat_avg/2
     elif metric == "TORSION":
-       d0=euclidMat_avg-2*euclidMat_sd
+       d0=euclidMat_avg-2*euclidMat_sd #FIXME: depends on euclidmat. Should find a standard.
     rho=[]
     for i in range(0,len(values)):
         rhoi=0.
@@ -314,18 +319,23 @@ def Clustering(time,values):
     totalElements=0
     clusters_forward={}
     outliers_forward={}
+    clusters_file='clusters.'+str(iteration)+'.txt'
+    fileout=open(clusters_file,'w')
     for center in clusters.keys():
         ps_snap=stride*dt
         fraction=len(clusters[center])*ps_snap
         #print fraction
         if fraction >= 5000:
-            print "Cluster with center at ", center, "picoseconds has ", len(clusters[center]), "elements. --CLUSTER"
+            line="Cluster with center at "+str(center)+ "picoseconds has "+str( len(clusters[center]))+ "elements. --CLUSTER\n"
+            fileout.write(line)
             clusters_forward[center]=clusters[center]
         else:
-            print "Cluster with center at ", center, "picoseconds has ", len(clusters[center]), "elements. --OUTLIER"
+            line="Cluster with center at "+str(center)+ "picoseconds has "+str( len(clusters[center]))+ "elements. --OUTLIER\n"
+            fileout.write(line)
             outliers_forward[center]=clusters[center]
 
         totalElements=totalElements+len(clusters[center])
+    fileout.close()
     NClust=len(clusters_forward.keys())
     Noutli=len(outliers_forward.keys())
     print "Total elements clustered:", totalElements, ". Number of observations: ",len(values)," (MUST BE THE SAME)"
@@ -459,7 +469,7 @@ def build_biasfile(atomGroups,labels,clusters,time,torsions,iteration,include):
 
 # In[12]:
 
-def combine_trajectories(iteration):
+def combine_trajectories(iteration,monitor_file):
     trajs=glob.glob('iteration'+str(iteration)+'*.trr')
     fileout=open('c.txt','w')
     line='c\n'*len(trajs)
@@ -467,13 +477,14 @@ def combine_trajectories(iteration):
     fileout.close()
     cmd='gmx trjcat -f '+' '.join(trajs)+' -o iteration'+str(iteration)+'.trr -cat -settime < c.txt'
     os.system(cmd)
-    z=raw_input('continue? ')
+    #z=raw_input('continue? ')
     colvar_je='JEDI.'+str(iteration)
-    cmd='cat JEDI.'+str(iteration)+'.* > JEDI.'+str(iteration)
+    #cmd='cat JEDI.'+str(iteration)+'.* > JEDI.'+str(iteration)
+    cmd='plumed driver --mf_trr iteration'+str(iteration)+'.trr --plumed '+monitor_file
     os.system(cmd)
     colvar_tor='colvar_torsions.dat.'+str(iteration)
-    cmd='cat colvar_torsions.dat.'+str(iteration)+'.* > colvar_torsions.dat.'+str(iteration)
-    os.system(cmd)
+    #cmd='cat colvar_torsions.dat.'+str(iteration)+'.* > colvar_torsions.dat.'+str(iteration)
+    #os.system(cmd)
     return colvar_je, colvar_tor
     
     
@@ -509,15 +520,16 @@ stride=1250
 dt=0.004
 strideps=stride*dt
 kappa=500
-mts=2
+mts=4
 at=7.3
 metric='TORSION'
 structure='1HNN.pdb'
 target='2G8N_equil.pdb'
 stride=1250
-maxIter=3
+maxIter=100
 ntomp=4
-nthreads=40
+nthreads=20
+gpu=4
 ndx='1HNN_index.ndx'
 mdp='production_50ns_4fs.mdp'
 top='1HNN.top'
@@ -541,14 +553,21 @@ for iteration in range(0,maxIter):
         tpr='iteration0.0.tpr'
         if not os.path.isfile(tpr):
             sys.exit("gromacs tpr file not found. ABORTING.")
-        cmd='gmx mdrun -v -deffnm '+tpr.split('.')[0]+'.'+tpr.split('.')[1]+' -plumed jedi_taboo.dat -ntomp '+str(ntomp)+' -nsteps 12500000'
+        if nthreads > 16:
+           ntomp_iter0=16
+        else:
+           ntomp_iter0=nthreads
+        cmd='gmx mdrun -v -deffnm '+tpr.split('.')[0]+'.'+tpr.split('.')[1]+' -plumed jedi_taboo.dat -ntomp '+str(ntomp_iter0)+' -gpu_id 0 -nsteps 1250000'
         os.system(cmd)
-        cmd='mv iteration0.0.trr iteration0.trr'
-        os.system(cmd)
-        colvar_je='JEDI.0.0'
-        colvar_tor='colvar_torsions.dat.0.0'
+        #cmd='mv iteration0.0.trr iteration0.trr'
+        #os.system(cmd)
+        #colvar_je='JEDI.0'
+        #colvar_tor='colvar_torsions.dat.0'
+        colvar_je,colvar_tor=combine_trajectories(iteration,monitor_cv)
+        print colvar_je, colvar_tor
+        #wait=raw_input("continue")
         time,jedi,torsions,torsion_dist=analysis_output(colvar_je,colvar_tor,residues,torsions_target,strideps)
-        clusters,outliers=Clustering(time,torsions)
+        clusters,outliers=Clustering(time,torsions,iteration)
         save_clusters(clusters,iteration,ndx)
         calc_avg(clusters,time,jedi,torsion_dist,iteration)
         cmd='rm \#* *-step-*'
@@ -561,8 +580,9 @@ for iteration in range(0,maxIter):
         
         fileout=open(nameOut,'w')
         nsim=0
+        gpu_id=0
         for replica in replica_index: # so for each outlier we restart from
-            if nsim*ntomp > nthreads:
+            if nsim*ntomp >= nthreads:
                 fileout.write('wait\n')
                 nsim=0
             nsim += 1
@@ -570,17 +590,20 @@ for iteration in range(0,maxIter):
             jedi_taboo_plumedat(monitor_cv,iteration,replica,apolar,polar,grid,stride,kappa,at,mts,include)
             nametpr='iteration'+str(iteration)+'.'+str(replica)
             nameplumed='jedi_taboo.'+str(iteration)+'.'+str(replica)+'.dat'
-            line='gmx mdrun -v -deffnm '+nametpr+' -plumed '+nameplumed+' -ntomp '+str(ntomp)+' -nsteps 12500000 &\n'
+            line='gmx mdrun -v -deffnm '+nametpr+' -plumed '+nameplumed+' -ntomp '+str(ntomp)+' -gpu_id '+str(gpu_id)+' -nsteps 1250000 &\n'
             fileout.write(line)
+            gpu_id=gpu_id+1
+            if gpu_id > gpu-1:
+               gpu_id=0
         fileout.write('wait')
         fileout.close()
         cmd='bash '+nameOut
         os.system(cmd)
-        colvar_je,colvar_tor=combine_trajectories(iteration)
+        colvar_je,colvar_tor=combine_trajectories(iteration,monitor_cv)
         cmd='rm iteration'+str(iteration)+'.*.trr'
         os.system(cmd)
         time,jedi,torsions,torsion_dist=analysis_output(colvar_je,colvar_tor,residues,torsions_target,strideps)
-        clusters,outliers=Clustering(time,torsions)
+        clusters,outliers=Clustering(time,torsions,iteration)
         save_clusters(clusters,iteration,ndx)
         calc_avg(clusters,time,jedi,torsion_dist,iteration)
         cmd='rm \#* *-step-*'
