@@ -326,11 +326,11 @@ def Clustering(time,values,iteration):
         fraction=len(clusters[center])*ps_snap
         #print fraction
         if fraction >= 5000:
-            line="Cluster with center at "+str(center)+ "picoseconds has "+str( len(clusters[center]))+ "elements. --CLUSTER\n"
+            line="Cluster with center at "+str(center)+ "picoseconds has been sampled for "+str(fraction)+ " picoseconds. --CLUSTER\n"
             fileout.write(line)
             clusters_forward[center]=clusters[center]
         else:
-            line="Cluster with center at "+str(center)+ "picoseconds has "+str( len(clusters[center]))+ "elements. --OUTLIER\n"
+            line="Cluster with center at "+str(center)+ "picoseconds has been sampled for "+str(fraction)+ " picoseconds. --OUTLIER\n"
             fileout.write(line)
             outliers_forward[center]=clusters[center]
 
