@@ -470,17 +470,23 @@ def build_biasfile(atomGroups,labels,clusters,time,torsions,iteration,include):
 # In[12]:
 
 def combine_trajectories(iteration,monitor_file):
+    TotalTraj="totaltraj.trr"
     trajs=glob.glob('iteration'+str(iteration)+'*.trr')
     fileout=open('c.txt','w')
-    line='c\n'*len(trajs)
+    line='c\n'*len(trajs+1)
     fileout.write(line)
     fileout.close()
-    cmd='gmx trjcat -f '+' '.join(trajs)+' -o iteration'+str(iteration)+'.trr -cat -settime < c.txt'
-    os.system(cmd)
+    if iteration==0:
+       cmd='mv iteration0.0.trr totaltraj.trr'
+       os.system(cmd)
+    else:
+       cmd='gmx trjcat -f totaltraj.trr '+' '.join(trajs)+' -o iteration'+str(iteration)+'.trr -cat -settime < c.txt'
+       os.system(cmd)
+       cmd="mv iteration"+str(iteration)+" totaltraj.trr"
     #z=raw_input('continue? ')
     colvar_je='JEDI.'+str(iteration)
     #cmd='cat JEDI.'+str(iteration)+'.* > JEDI.'+str(iteration)
-    cmd='plumed driver --mf_trr iteration'+str(iteration)+'.trr --plumed '+monitor_file
+    cmd='plumed driver --mf_trr totaltraj.trr --plumed '+monitor_file
     os.system(cmd)
     colvar_tor='colvar_torsions.dat.'+str(iteration)
     #cmd='cat colvar_torsions.dat.'+str(iteration)+'.* > colvar_torsions.dat.'+str(iteration)
