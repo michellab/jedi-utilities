@@ -1,0 +1,11 @@
+#PLUMED FILES
+cv=JEDI #DRUGGABILITY FUNCTION
+apolar=apolar.pdb
+polar=polar.pdb
+grid=grid.pdb
+jedi_params=jedi.params
+stride=1250
+
+#GENERAL FILES
+reference_structure=system_allh.pdb
+metric=SC_TORSION
