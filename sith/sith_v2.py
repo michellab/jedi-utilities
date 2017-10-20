@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 #
 """
- @AUTHOR Julien Michel. Sep 2015.
+ @AUTHOR Joan Clark-Nicolas. Oct 2017.
  @USAGE
   ///FILL IN WITH USAGE///
 
@@ -71,15 +71,152 @@ ERROR ! The input cannot be found. See usage above.
             
             parameters[line[0]]=line[1]
 
+    # Getting Target extension           
+    supported_target_extensions=['pdb','gro','trr','dcd','crd','crdbox','g96','trr','trj','xtc']
+    if 'target' not in parameters.keys():
+        parameters['target']=None
+    else:
+        target_ext=parameters['target'].split('.')[-1]
+        if target_ext not in supported_target_extensions:
+           print "ERROR: Target extension '"+target_ext+"' not supported."
+           print "Supported target extensions are: "+','.join(supported_target_extensions)+". Exiting."
+           sys.exit()
+        else:
+           parameters['target_extension']=target_ext
+
+    # Getting MD engine executables
+    supported_mden=['GROMACS']
+    if 'md_engine' not in parameters.keys():
+       parameters['md_engine']='GROMACS'
+       print "MD Engine not specified. Going to use "+parameters['md_engine']+'.'
+    elif parameters['md_engine'] not in supported_mden:
+       print "ERROR: MD engine '"+parameters['md_engine']+"is not supported (yet?)."
+       print "Supported MD engines are: "+','.join(supported_mden)
+       sys.exit()
+    if parameters['md_engine']=='GROMACS':
+       if 'gmx_path' not in parameters.keys():
+          parameters['gmx_path']='/usr/bin/gmx'
+          print "looking for gromacs in /usr/bin/gmx"
+       if not os.path.isfile(parameters['gmx_path']):
+          print "ERROR: GROMACS executable cannot be found. Exiting"
+          sys.exit()
+       # Check that we have all the files that gromacs needs
+       if 'tpr' not in parameters.keys():
+          print "You must supply the tpr file for the fist iteration with option 'tpr='. Exiting."
+          sys.exit()
+       elif not os.path.isfile(parameters['tpr']):
+          print "file "+parameters['tpr']+" not found. Exiting"
+          sys.exit()
+
+       if 'top' not in parameters.keys():
+          print "You must supply the top file for grompp with option 'top='. Exiting."
+          sys.exit()
+       elif not os.path.isfile(parameters['top']):
+          print "file "+parameters['top']+" not found. Exiting"
+          sys.exit()
+
+       if 'ndx' not in parameters.keys():
+          print "You must supply the index file for grompp with 'ndx='. Exiting."
+          sys.exit()
+       elif not os.path.isfile(parameters['ndx']):
+          print "file "+parameters['tpr']+" not found. Exiting"
+          sys.exit()
+
+
+
+    # Getting PLUMED executable
+    if 'plumed_exec' not in parameters.keys():
+        parameters['plumed_exec']='/usr/bin/plumed'
+        print "looking for PLUMED in /usr/bin/plumed"
+    if not os.path.isfile(parameters['plumed_exec']):
+        print "WARNING! PLUMED executable not found." 
+        print "You might be able to continue if you didn't specify a target AND you are sure that your MD code is patched."
+
+    
+    # MPI related stuff
+    if 'mpi_exec' not in parameters.keys():
+        print "looking for mpirun in /usr/bin/mpirun." 
+        print "WARNING: THIS PROGRAM WILL CRASH IF YOU DON'T HAVE MPI."
+        parameters['mpi_exec']='/usr/bin/mpirun'
+ 
+    # Getting info to restart in case of crash:
+    if 'st_iter' not in parameters.keys():
+        parameters['st_iter']=0
+    if 'include' not in parameters.keys():
+        parameters['include']=[]
+    else:
+        include=parameters['include'].split(',')
+        for bias in include:
+            if not os.path.isfile(bias):
+               print "Biasing file '"+bias+"' needed and not found. Exiting"
+    
     return parameters
 
 
+def setup_queue(parameters):
+    supported_queues=['slurm']
+    
+    if 'q_system' not in parameters.keys():
+       parameters['q_system']='slurm'
+    elif parameters['q_system'] not in supported_queues:
+        print "ERROR: Queue system '"+parameters['q_system']+"' is not supported."
+        print "Supported queue systems are: "+','.join(supported_queues)
+        sys.exit()
+    
+    if 'q_name' not in parameters.keys():
+       print "Error: The queue name must be specified with option 'q_name='. Exiting."
+       sys.exit()
+    
+       if 'q_time' not in parameters.keys():
+          print "Error: The time a job can stay in the queue must be specified with option 'q_time='. Exiting."
+          sys.exit()
+    
+    if parameters['q_system']=='slurm':
+       if 'sbatch' not in parameters.keys(): 
+          parameters['sbatch']='/usr/local/bin/sbatch'
+          print "looking for sbatch in /usr/local/bin/sbatch"
+       if not os.path.isfile(parameters['sbatch']):
+          print "Error: "+parameters['sbatch']+" not found. Exiting." 
+          sys.exit()
+
+    return parameters
+
+def genEnVar(parameters):
+
+    if 'max_iter' not in parameters.keys():
+        print "Maximum number of iterations not specified. Setting it to 1000"    
+        parameters['max_iter']=1000
+
+    if 'nthreads' not in parameters.keys():
+        print "The number of available cores has to be specified with option 'nthreads='. Exiting"
+        sys.exit()
+    if 'ngpu' not in parameters.keys():
+        print "The number of available gpus has to be specified with option 'ngpu='. Exiting"
+        sys.exit()
+    if 'ntomp' not in parameters.keys():
+        print "The number of cores to be used in each replica has to be specified with option 'ntomp='. Exiting"
+        sys.exit()
+    
+
+    nthreads=parameters['nthreads']
+    ntomp=parameters['ntomp']
+    ngpu=parameters['ngpu']
+    nsim=int(int(nthreads)/int(ntomp))
+    parameters['nsim']=nsim
+    if nsim%int(ngpu)!=0:
+       print "The number of simulations has to be a multiple of the number of GPUS for MPI related reasons." 
+       print "Please fix that by editing ntomp, nthreads or ngpu [nsim=nthreads/ntomp]. Exiting"
+       sys.exit()
+    print "Each iteration will run "+str(nsim)+" replicas with "+str(ntomp)+" cores each"
+    
+    return parameters
+
 # Check that the chosen CV is supported and get the necessary parameters
 def getCV(parameters):
-
+    
     supported_cvs=['JEDI']
 
-    if 'cv' not in parameters.keys():
+    if 'cv' not in parameters.keys(): #FIXME: this assumes that only one CV is taken as the main one
        print "ERROR: Main CV must be defined with the option 'cv='."
        print "Supported CVs so far are: "+','.join(supported_cvs)+'. Exiting'
        sys.exit()
@@ -89,6 +226,7 @@ def getCV(parameters):
        sys.exit()
     else:
        cv=parameters['cv']
+       
     
     if cv=='JEDI':
 
@@ -162,7 +300,42 @@ def getMetric(parameters):
           print "ERROR: Collective variable '"+cv+"' not supported with metric '"+metric+"'."
           print "This metric supports the following CVs: "+','.join(supported_cvs_metric[metric])
           sys.exit()
+    return parameters
+
+def getBias(prameters):
+    supported_biases=['RESTRAINT','LOWER_WALLS','UPPER_WALLS']
+    if 'bias' not in parameters.keys():
+       print "ERROR: You must define a biasing method with the option 'bias='. Exiting"
+       sys.exit()
+    elif parameters['bias'] not in supported_biases:
+       print "ERROR: biasing method '"+parameters['bias']+"' is not supported."
+       print "Supported biasing methods are: "+','.join(supported_biases)+". Exiting."
+       sys.exit()
+    else:
+       bias=parameters['bias']
     
+    if 'mts_cv' not in parameters.keys():
+       print "Stride for multiple time step in biasing force calculation for CV not specified. Setting it to 1."
+       parameters['mts_cv']=1
+    if 'mts_metric' not in parameters.keys():
+       print "Stride for multiple time step in biasing force calculation in metric not specified. Setting it to 1."
+       parameters['mts_metric']=1
+
+    if bias=='RESTRAINT' or  bias=='LOWER_WALLS' or bias=='UPPER_WALLS':
+       if 'at_cv' not in parameters.keys():
+           print "ERROR: You must define an equilibrium value for your CV with option 'at_cv='. Exiting"
+       if 'kappa_cv' not in parameters.keys():
+           print "KAPPA for CV not specified. setting it to 100 kJ/(mol*(nm**2))"
+           parameters['kappa_cv']=100
+       if 'at_metric' not in parameters.keys():
+           print "ERROR: You must define an equilibrium value for your metirc with option 'at_metric='. Exiting"
+       if 'kappa_metric' not in parameters.keys():
+           print "KAPPA for metric not specified. setting it to 100 kJ/(mol*(nm**2))"
+           parameters['kappa_metric']=100
+    
+    return parameters
+    
+
 def setupMetric(parameters):
     
     metric=parameters['metric']
@@ -186,8 +359,8 @@ def setupMetric(parameters):
           residues_str=[]
           residues=[]
           for pdb in [apolar,polar]:
-              structure=mdtraj.load_pdb(pdb)
-              for res in structure.topology.residues:
+              site=mdtraj.load_pdb(pdb)
+              for res in site.topology.residues:
                   if str(res) not in residues_str and "GLY" not in str(res):
                      residues_str.append(str(res))
                      residues.append(res)
@@ -251,7 +424,7 @@ def setupMetric(parameters):
                  print "something went wrong when assigning dihedrals. A dihedral can't have a number of atoms different than 4"
                  break
 
-          fileout=open('torsions_sidechains.dat','w')
+          fileout=open('metric.dat','w')
           for key in chi.keys():
               line=key+': TORSION ATOMS='+','.join(chi[key])+'\n'
               fileout.write(line)
@@ -261,23 +434,225 @@ def setupMetric(parameters):
               fileout.write(line)
           fileout.close()
           print "The sines and cosines of "+str(len(chi.keys()))+ " torsions are going to be used as a metric."
-          print "This is a total of "+str(3*len(chi.keys()))+" variables"
+          print "This is a total of "+str(2*len(chi.keys()))+" variables"
           return chi
 
           
+def analyse_target(parameters,metric_input):
+    
+    metric=parameters['metric']
+    cv=parameters['cv']
+    target=parameters['target']
+    
+    fileout=open('metric_reference.dat','w')
+    line='INCLUDE FILE=metric.dat\n'
+    fileout.write(line)
+    
+    if cv=='JEDI':
+       line='cv: JEDI'
+       line=line+' APOLAR='+parameters['apolar']
+       line=line+' POLAR='+parameters['polar']
+       line=line+' GRID='+parameters['grid']
+       if parameters['ligand'] is not None:
+          line=line+' SITE='+parameters['ligand']
+       line=line+' PARAMETERS='+parameters['jedi_params']
+       line=line+' STRIDE='+parameters['stride']
+       line=line+' SUMMARY='+parameters['summary']
+       line=line+' GRIDSTRIDE='+parameters['gridstride']
+       line=line+' DUMPDERIVATIVES='+parameters['dumpderivatives']
+       if parameters['metaD_sigma'] is not None:
+          line=line+' SIGMA='+parameters['metaD_sigma']
+       line=line+'\n'
+       fileout.write(line)
 
+    if metric=='SC_TORSION':
+       metric_lab=[]
+       for key in metric_input.keys():
+           sin='sin_'+key
+           metric_lab.append(sin)
+           cos='cos_'+key
+           metric_lab.append(cos)
+
+    line='PRINT ARG=cv,'+','.join(metric_lab)+' STRIDE=1 FILE=TARGET.colvar' # stride is 1 because we'll use driver
+    fileout.write(line)
+
+    fileout.close()
+           
+    if parameters['target_extension']=='xyz' or parameters['target_extension']=='gro':
+       inputflag='--i'
+    else:
+       inputflag='--mf_'
+    driver=parameters['plumed_exec']+' driver '+inputflag+parameters['target_extension']+' '+parameters['target']+' --plumed metric_reference.dat'
+    os.system(driver)
+
+    time,metric_list_val,cv_list_val,metric_avg,metric_sd,cv_avg,cv_sd=analyse_plumed_output('TARGET.colvar')
+
+    print "Target CV is: "+str(cv_avg)+" +/- "+str(cv_sd)
+    print "Target metric is: "+str(metric_avg)+" +/- "+str(metric_sd)
+
+    return metric_avg,metric_sd,cv_avg,cv_sd
+
+def analyse_plumed_output(nameIn):
+     
+    #FIXME: this is assuming that the main CV is only one AND it is the first one after 'time'. Should not be very difficult to modify.
+    filein=open(nameIn,'r')
+    cv_list_val=[]
+    metric_list_val=[]
+    time=[]
+    for line in filein:
+        if line.startswith('#'):
+           continue
+        else:
+           line=line.split()
+           time.append(float(line[0]))
+           cv_lst_line=[]
+           cv_lst_line.append(float(line[1]))
+           cv_list_val.append(cv_lst_line)
+           val_lst_line=[]
+           for val in line[2:]:
+               val_lst_line.append(float(val))
+           metric_list_val.append(val_lst_line)
+    
+    cv_list_val=numpy.asarray(cv_list_val)
+    metric_list_val=numpy.asarray(metric_list_val)
+  
+    #print metric_list_val
+    #print  type(metric_list_val)
+
+    cv_avg=numpy.average(cv_list_val,axis=0)
+    cv_sd=numpy.std(cv_list_val,axis=0)
  
+    metric_avg=numpy.average(metric_list_val,axis=0)
+    metric_sd=numpy.std(metric_list_val,axis=0)      
+
+    return  time, metric_list_val, cv_list_val, metric_avg, metric_sd, cv_avg, cv_sd
+
+def gen_plumed_input(parameters,include):
+
+    metric=parameters['metric']
+    cv=parameters['cv']
+    bias=parameters['bias']
+    stride=parameters['stride']
+
+    fileout=open('taboo_bias.dat','w')
+    
+    fileout.write('INCLUDE FILE=metric.dat\n')    
+
+    if cv=="JEDI":
+       line='cv: JEDI'
+       line=line+' APOLAR='+parameters['apolar']
+       line=line+' POLAR='+parameters['polar']
+       line=line+' GRID='+parameters['grid']
+       if parameters['ligand'] is not None:
+          line=line+' SITE='+parameters['ligand']
+       line=line+' PARAMETERS='+parameters['jedi_params']
+       line=line+' STRIDE='+parameters['stride']
+       line=line+' SUMMARY='+parameters['summary']
+       line=line+' GRIDSTRIDE='+parameters['gridstride']
+       line=line+' DUMPDERIVATIVES='+parameters['dumpderivatives']
+       if parameters['metaD_sigma'] is not None:
+          line=line+' SIGMA='+parameters['metaD_sigma']
+       line=line+'\n'
+       fileout.write(line)
+ 
+    if bias=="LOWER_WALLS":
+       at_cv=parameters['at_cv']
+       kappa_cv=parameters['kappa_cv']
+       mts_cv=parameters['mts_cv']
+       at_metric=parameters['at_metric']
+       kappa_metric=parameters['kappa_metric']
+       mts_metric=parameters['mts_metric']
+   
+       line='res_cv: LOWER_WALLS ARG=cv AT='+str(at_cv)+' KAPPA='+str(kappa_cv)+' STRIDE='+str(mts_cv)+'\n'
+       for bias in include:
+           line='INCLUDE FILE='+bias+'\n'
+ 
+    if metric=='SC_TORSION':
+       metric_lab=[]
+       for key in metric_input.keys():
+           sin='sin_'+key
+           metric_lab.append(sin)
+           cos='cos_'+key
+           metric_lab.append(cos)
+    else:
+       metric_lab=metric_input.keys()
+
+    line='PRINT ARG=cv,'+','.join(metric_lab)+' STRIDE='+stride+' FILE=COLVAR'
+    fileout.write(line)
+    fileout.close()
+
+def submit_calc(parameters,iteration):
+    nameOut='iteration'+str(iteration)+'.sh'
+    fileout=open(nameOut,'w')
+    
+    q_system=parameters['q_system']
+    q_name=parameters['q_name']
+  
+    # Writing input file
+
+    if q_system=='slurm':
+      line='#!/bin/bash\n'
+      line=line+'#SBATCH --job-name=iteration'+str(iteration)+'\n'
+      line=line+'#SBATCH -o iteration'+str(iteration)+'.out\n'
+      line=line+'#SBATCH -e iteration'+str(iteration)+'.err\n'
+      line=line+'#SBATCH -p '+q_name+'\n'
+      line=line+'#SBATCH -n '+str(parameters['nthreads'])+'\n'
+      line=line+'#SBATCH -N 1\n' # request entire node
+      if int(parameters['ngpu'])>0:
+         line=line+'#SBATCH --gres=gpu:'+str(parameters['ngpu'])+'\n'
+      line=line+'#SBATCH --time '+parameters['q_time']+'\n'
+      fileout.write(line)
+
+    if parameters['md_engine']=='GROMACS':
+       if iteration==0:
+          for i in range(0,int(parameters['nsim'])):
+             cmd='cp '+parameters['tpr']+' iteration0'+str(i)+'.tpr'
+             os.system(cmd)
+       deffnm='iteration'+str(iteration)
+       line=parameters['mpi_exec']+' -n '+str(parameters['nsim'])+' '+\
+            parameters['gmx_path']+' mdrun -ntomp '+str(parameters['ntomp'])+\
+            ' -deffnm '+deffnm+' -plumed taboo_bias.dat -multi '+str(parameters['nsim'])
+       fileout.write(line)
+    
+    fileout.close()
+
+    # Sumbitting the job
+    if q_system=='slurm':
+       cmd=parameters['sbatch']+' '+nameOut
+       os.system(cmd)
+       message="Sumbitted job iteration"+str(iteration)+"Now what do I do?"
+       z=raw_input(message)
+
+     
+
 if __name__ == '__main__':
 
     ######## SET UP PARAMETERS AND RUN SANITY CHECKS #########
     
-    parameters=parse(parser)
+    parameters=parse(parser) # Get all parameters from input file
+
+    parameters=setup_queue(parameters)
+
+    parameters=genEnVar(parameters)
     
     parameters=getCV(parameters) #Set up the CV of use
 
-    getMetric(parameters)
+    parameters=getMetric(parameters) # Check that the chosen metric is supported and can work with the chosen CV
+
+    parameters=getBias(parameters)
 
 
-   ######### DO STUFF ######################
+   ######### PREPARE FILES TO BE USED  ######################
    
-    metric_input=setupMetric(parameters)
+    metric_input=setupMetric(parameters) # Get the necessary parameters for the metric of use
+
+    if parameters['target'] is not None:
+       metricAvgTarget,metricSDTarget,cvAvgTarget,cvSDTarget=analyse_target(parameters,metric_input)
+
+    ######## DO ACTUALLY INTERESTING STUFF (WHEN IT IS NOT CRASHING) ####################
+
+    include=parameters['include'] # list of biasing potentials
+    
+    for iteration in range(0,int(parameters['max_iter'])):
+        taboo_plumedat=gen_plumed_input(parameters,include)
+        qsub_md=submit_calc(parameters,iteration)  
