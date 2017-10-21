@@ -93,6 +93,16 @@ ERROR ! The input cannot be found. See usage above.
        print "ERROR: MD engine '"+parameters['md_engine']+"is not supported (yet?)."
        print "Supported MD engines are: "+','.join(supported_mden)
        sys.exit()
+    if 'simtime' not in parameters.keys():
+        print "Please specify the simulation time using option 'simtime='. Exiting"
+        sys.exit()
+    if 'dt' not in parameters.keys():
+        print "Please specify MD time step using option 'dt=. Exiting'"
+        sys.exit
+
+    nsteps=str(int(float(parameters['simtime'])/float(parameters['dt'])))
+    parameters['nsteps']=nsteps
+
     if parameters['md_engine']=='GROMACS':
        if 'gmx_path' not in parameters.keys():
           parameters['gmx_path']='/usr/bin/gmx'
@@ -149,6 +159,24 @@ ERROR ! The input cannot be found. See usage above.
         for bias in include:
             if not os.path.isfile(bias):
                print "Biasing file '"+bias+"' needed and not found. Exiting"
+
+    #Getting clustering info    
+    supported_clusterings=['density_Laio']
+    if 'clustering' not in parameters.keys():
+        print "Clustering method not specified. Will use the density method by Rodriguez and Laio (Science (2014), 344(6191) 1492-1496)"
+        parameters['clustering']='density_Laio'
+    elif parameters['clustering'] not in supported_clusterings:
+        print "Clustering method must be specified with option 'clustering='."
+        print "Supported clustering methods are: "+','.join(supported_clusterings)+". Exiting."
+        sys.exit()
+    if parameters['clustering']=='density_Laio':
+       if 'cluster_dc' not in parameters.keys():
+          print "The value for dc or a way to calculate it has not been specified. Will use d0=euclidMat_avg-2*euclidMat_sd"
+          parameters['cluster_dc']='avg-2sd'
+    
+    if 'sampltime' not in parameters.keys():
+        print "The time in ps for which a populated cluster has to be sampled must be defined with option 'sampltime='. Exiting."
+        sys.exit()
     
     return parameters
 
@@ -203,10 +231,11 @@ def genEnVar(parameters):
     ngpu=parameters['ngpu']
     nsim=int(int(nthreads)/int(ntomp))
     parameters['nsim']=nsim
-    if nsim%int(ngpu)!=0:
-       print "The number of simulations has to be a multiple of the number of GPUS for MPI related reasons." 
-       print "Please fix that by editing ntomp, nthreads or ngpu [nsim=nthreads/ntomp]. Exiting"
-       sys.exit()
+    if int(ngpu)!=0:
+       if nsim%int(ngpu)!=0:
+          print "The number of simulations has to be a multiple of the number of GPUS for MPI related reasons." 
+          print "Please fix that by editing ntomp, nthreads or ngpu [nsim=nthreads/ntomp]. Exiting"
+          sys.exit()
     print "Each iteration will run "+str(nsim)+" replicas with "+str(ntomp)+" cores each"
     
     return parameters
@@ -492,19 +521,31 @@ def analyse_target(parameters,metric_input):
 
     return metric_avg,metric_sd,cv_avg,cv_sd
 
-def analyse_plumed_output(nameIn):
+def analyse_plumed_output(parameters, nameIn):
      
     #FIXME: this is assuming that the main CV is only one AND it is the first one after 'time'. Should not be very difficult to modify.
     filein=open(nameIn,'r')
     cv_list_val=[]
     metric_list_val=[]
     time=[]
+    dt=float(parameters['dt'])
+    stride=int(parameters['stride'])
+    strideps=dt*stride
+    lenline=None
+    linum=0
     for line in filein:
         if line.startswith('#'):
            continue
         else:
+           time_ps=linum*strideps
+           time.append(time_ps)
            line=line.split()
-           time.append(float(line[0]))
+           if lenline==None:
+              lenline=len(line)
+           else:
+              if len(line)!=lenline:
+                 message="File '"+nameIn+"' appears to be malformed at time "+str(time)+" ps, probably due to a crash. Skipping line"
+                 continue
            cv_lst_line=[]
            cv_lst_line.append(float(line[1]))
            cv_list_val.append(cv_lst_line)
@@ -512,7 +553,8 @@ def analyse_plumed_output(nameIn):
            for val in line[2:]:
                val_lst_line.append(float(val))
            metric_list_val.append(val_lst_line)
-    
+        linum=linum+1
+
     cv_list_val=numpy.asarray(cv_list_val)
     metric_list_val=numpy.asarray(metric_list_val)
   
@@ -611,19 +653,225 @@ def submit_calc(parameters,iteration):
        deffnm='iteration'+str(iteration)
        line=parameters['mpi_exec']+' -n '+str(parameters['nsim'])+' '+\
             parameters['gmx_path']+' mdrun -ntomp '+str(parameters['ntomp'])+\
-            ' -deffnm '+deffnm+' -plumed taboo_bias.dat -multi '+str(parameters['nsim'])
+            ' -deffnm '+deffnm+' -nsteps '+parameters['nsteps']+' -plumed taboo_bias.dat -multi '+str(parameters['nsim'])+'\n'
        fileout.write(line)
-    
+
+       line='touch calculation_finished.ok' # This is just to check whether the calculation finished or not
+       fileout.write(line)
     fileout.close()
 
     # Sumbitting the job
     if q_system=='slurm':
        cmd=parameters['sbatch']+' '+nameOut
        os.system(cmd)
-       message="Sumbitted job iteration"+str(iteration)+"Now what do I do?"
-       z=raw_input(message)
+    
+    while not os.path.isfile('calculation_finished.ok'): # the program will loop here until it finds te calculation_finished.ok file
+       continue 
+    os.system('rm calculation_finished.ok')
 
      
+def combine_trajectories(iteration,parameters):
+    if parameters['md_engine']=='GROMACS':
+  
+       # Combine MD files
+       totaltraj="totaltraj.trr"
+       trajs=glob.glob('iteration'+str(iteration)+'*.trr')
+       fileout=open('c.txt','w')
+       c_len=len(trajs)
+       if os.path.isfile(totaltraj):
+          c_len=c_len+1
+       line='c\n'*(c_len)
+       fileout.write(line)
+       fileout.close()
+       if not os.path.isfile(totaltraj):
+          cmd='gmx trjcat -f '+' '.join(trajs)+' -o iteration'+str(iteration)+'.trr -cat -settime < c.txt'
+          os.system(cmd)
+       else:
+          cmd='gmx trjcat -f totaltraj.trr '+' '.join(trajs)+' -o iteration'+str(iteration)+'.trr -cat -settime < c.txt'
+          os.system(cmd)
+       cmd='mv iteration'+str(iteration)+'.trr totaltraj.trr'
+       os.system(cmd)
+       cmd='rm iteration'+str(iteration)+'*'
+       os.system(cmd)
+       
+    # Combine PLUMED COLVAR files
+    totalplumed='COLVAR'
+    colvars=glob.glob('COLVAR.*')
+    if not os.path.isfile(totalplumed):
+       cmd='cat '+' '.join(colvars)+' > '+totalplumed
+       os.system(cmd)
+    else:
+       cmd='cat '+totalplumed+' '+' '.join(colvars)+' > '+totalplumed
+       os.system(cmd)
+    cmd='rm COLVAR.*'
+    os.system(cmd)
+    
+    time,metric_list_val,cv_list_val,metric_avg,metric_sd,cv_avg,cv_sd=analyse_plumed_output(parameters,'COLVAR')
+    
+    print time
+   
+    return cv_list_val, metric_list_val,time
+
+
+def clustering(time,values,iteration,parameters):
+
+    if parameters['clustering']=='density_Laio':
+        #calculate euclidean distances:
+        print "Calculating euclidean distances"
+        euclidMat=[]
+        euclidMat_stats=[]
+        for i in range (0,len(values)):
+            euclid=[]
+            for j in range(0,len(values)):
+                if i==j:
+                   euclid.append(99999999.)
+                elif j>i:
+                   euclid.append(numpy.linalg.norm(values[i]-values[j]))
+                   euclidMat_stats.append(numpy.linalg.norm(values[i]-values[j]))
+                elif j<i:
+                   euclid.append(99999999.)
+            euclidMat.append(euclid)
+        euclidMat=numpy.array(euclidMat)
+        #print euclidMat
+        euclidMat_avg=numpy.mean(euclidMat_stats)
+        euclidMat_sd=numpy.std(euclidMat_stats)
+
+        #print "euclidMat_avg = ", euclidMat_avg
+        #print "euclidMat_sd = ", euclidMat_sd
+
+        #calculte rho for each data point
+        if parameters['cluster_dc']=='avg-2sd':
+           d0=euclidMat_avg-2*euclidMat_sd 
+        
+        rho=[]
+        for i in range(0,len(values)):
+            rhoi=0.
+            for j in range(0,len(values)):
+                if j==i:
+                   continue
+                elif j>i:
+                   #print j, i
+                   if euclidMat[i][j]<d0:
+                      rhoi=rhoi+1
+                elif j<i:
+                   if euclidMat[j][i]<d0:
+                      rhoi=rhoi+1
+            rho.append(rhoi)
+        #print rho
+
+        #calculate delta for each data point:
+        delta=[]
+        for i in range(0,len(values)):
+            deltai=999999999.
+            for j in range(0,len(values)):
+                if j==i:
+                   continue
+                elif j>i:
+                   if (rho[j]>rho[i]) and (euclidMat[i][j]<deltai):
+                      deltai=euclidMat[i][j]
+                elif j<i:
+                   if (rho[j]>rho[i]) and (euclidMat[j][i]<deltai):
+                      deltai=euclidMat[j][i]
+            delta.append(deltai)
+
+        # correct the value for the point with maximum density. 
+        #This is done different than in the paper. In the paper
+        # the delta value for this point is the distance with
+        # the furthest point.
+        deltai=0.
+        for i in range(0,len(delta)):
+            if delta[i]!=999999999. and delta[i]>deltai:
+                deltai=delta[i]
+        for i in range(0,len(delta)):
+            if delta[i]==999999999.:
+                delta[i]=deltai
+
+        fileout=open('rhodelta.txt','w')
+        for i in range(1,len(values)):
+            line=str(time[i])+' '+str(rho[i])+' '+str(delta[i])+'\n'
+            fileout.write(line)
+        fileout.close()
+
+        rhodelta=numpy.array([time,rho,delta]).transpose().astype(float)
+        #print rhodelta
+
+        maxdelta=max(rhodelta[:,2])
+        #print "Maximum density is:", maxdelta
+
+        clusterCenters=[]
+        for i in range(0,len(values)):
+            if delta[i] >= maxdelta*0.95:
+               if len(clusterCenters)==0: # The paper doesn't consider the case where 2 points of the dataset are the same. Added this trick.
+                  clusterCenters.append(i)
+                  print i, time[i]
+               else:
+                  dis=[]
+                  for j in clusterCenters:
+                      dis.append(euclidMat[j][i])
+                  if 0. not in dis:
+                     print i, j, time[i], dis
+                     clusterCenters.append(i)
+       
+        #print "Found",len(clusterCenters), "cluster centers"
+
+        clusters={}
+        for center in clusterCenters:
+            #print "Found center", center, "at time=", time[center], "picoseconds."
+            clusters[time[center]]=[]
+
+        # Assign each point to the cluster corresponding to the closest cluster center
+        for i in range(0,len(values)):
+            disti=[]
+            for j in clusterCenters:
+                if j==i:
+                    disti.append(0.)
+                elif j>i:
+                    disti.append(euclidMat[i][j])
+                elif j<i:
+                    disti.append(euclidMat[j][i])
+            mindisti=min(disti)
+            jmindist=disti.index(mindisti)
+            center=clusterCenters[jmindist]
+            clusters[time[center]].append(time[i])
+
+    #check how many elements are in each cluster
+    totalElements=0
+    clusters_forward={}
+    outliers_forward={}
+    clusters_file='clusters.'+str(iteration)+'.txt'
+    fileout=open(clusters_file,'w')
+    for center in clusters.keys():
+        sampltime=len(clusters[center])*float(parameters['stride'])*float(parameters['dt'])
+        #print fraction
+        if sampltime >= float(parameters['sampltime']):
+            line="Cluster with center at "+str(center)+ " picoseconds has been sampled for "+str(sampltime)+ " picoseconds. --CLUSTER\n"
+            fileout.write(line)
+            clusters_forward[center]=clusters[center]
+        else:
+            line="Cluster with center at "+str(center)+ " picoseconds has been sampled for "+str(sampltime)+ " picoseconds. --OUTLIER\n"
+            fileout.write(line)
+            outliers_forward[center]=clusters[center]
+
+        totalElements=totalElements+len(clusters[center])
+    fileout.close()
+    NClust=len(clusters_forward.keys())
+    Noutli=len(outliers_forward.keys())
+    #print "Total elements clustered:", totalElements, ". Number of observations: ",len(values)," (MUST BE THE SAME)"
+    #print "Number of clusters: ", NClust
+    #print "Number of outliers: ", Noutli
+    #print "---------------------------------------------------------"
+
+
+#    print clusters_forward    
+#    sys.exit()
+    print clusters_forward
+    print "----------------"
+    print outliers_forward
+    return clusters_forward,outliers_forward
+
+      
+          
+
 
 if __name__ == '__main__':
 
@@ -656,3 +904,5 @@ if __name__ == '__main__':
     for iteration in range(0,int(parameters['max_iter'])):
         taboo_plumedat=gen_plumed_input(parameters,include)
         qsub_md=submit_calc(parameters,iteration)  
+        cv_arr,metric_arr,time=combine_trajectories(iteration,parameters)
+        clusters,outliers=clustering(time,metric_arr,iteration,parameters) 
