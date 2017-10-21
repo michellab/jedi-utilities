@@ -111,6 +111,13 @@ ERROR ! The input cannot be found. See usage above.
           print "ERROR: GROMACS executable cannot be found. Exiting"
           sys.exit()
        # Check that we have all the files that gromacs needs
+       if 'mdp' not in parameters.keys():
+          print "Gromacs mdp file was not specified. Will use 'md.mdp'"
+          parameters['mdp']='md.mdp'
+       elif not os.path.isfile(parameters['mdp']):
+          print "Error: file '"+parameters['mdp']+"'. Could not be found. Exiting."
+          sys.exit()
+       
        if 'tpr' not in parameters.keys():
           print "You must supply the tpr file for the fist iteration with option 'tpr='. Exiting."
           sys.exit()
@@ -124,6 +131,20 @@ ERROR ! The input cannot be found. See usage above.
        elif not os.path.isfile(parameters['top']):
           print "file "+parameters['top']+" not found. Exiting"
           sys.exit()
+       else:
+          filein=open(parameters['top'],'r')
+          for line in filein:
+              if line.startswith(';'):
+                 continue
+              elif "[ moleculetype ]" in line:
+                 break
+              else:
+                 if "#include" in line and ".ff/" not in line:
+                    line=line.split()
+                    file_to_search=line[1].strip("\"")
+                    if not os.path.isfile(file_to_search):
+                       print "Error: file '"+file_to_search+"' was not found but is included in the GROMACS top file. Exiting."
+                       sys.exit()
 
        if 'ndx' not in parameters.keys():
           print "You must supply the index file for grompp with 'ndx='. Exiting."
@@ -606,8 +627,12 @@ def gen_plumed_input(parameters,include):
        mts_metric=parameters['mts_metric']
    
        line='res_cv: LOWER_WALLS ARG=cv AT='+str(at_cv)+' KAPPA='+str(kappa_cv)+' STRIDE='+str(mts_cv)+'\n'
-       for bias in include:
-           line='INCLUDE FILE='+bias+'\n'
+       fileout.write(line)
+
+    for bias in include:
+        line='INCLUDE FILE='+bias+'\n'
+        fileout.write(line)
+        
  
     if metric=='SC_TORSION':
        metric_lab=[]
@@ -646,10 +671,9 @@ def submit_calc(parameters,iteration):
       fileout.write(line)
 
     if parameters['md_engine']=='GROMACS':
-       if iteration==0:
-          for i in range(0,int(parameters['nsim'])):
-             cmd='cp '+parameters['tpr']+' iteration0'+str(i)+'.tpr'
-             os.system(cmd)
+       for i in range(0,int(parameters['nsim'])):
+          cmd='cp '+parameters['tpr']+' iteration0'+str(i)+'.tpr'
+          os.system(cmd)
        deffnm='iteration'+str(iteration)
        line=parameters['mpi_exec']+' -n '+str(parameters['nsim'])+' '+\
             parameters['gmx_path']+' mdrun -ntomp '+str(parameters['ntomp'])+\
@@ -701,8 +725,9 @@ def combine_trajectories(iteration,parameters):
        cmd='cat '+' '.join(colvars)+' > '+totalplumed
        os.system(cmd)
     else:
-       cmd='cat '+totalplumed+' '+' '.join(colvars)+' > '+totalplumed
+       cmd='cat '+totalplumed+' '+' '.join(colvars)+' > tmp.cv' 
        os.system(cmd)
+       cmd='mv tmp.cv '+totalplumed
     cmd='rm COLVAR.*'
     os.system(cmd)
     
@@ -803,13 +828,13 @@ def clustering(time,values,iteration,parameters):
             if delta[i] >= maxdelta*0.95:
                if len(clusterCenters)==0: # The paper doesn't consider the case where 2 points of the dataset are the same. Added this trick.
                   clusterCenters.append(i)
-                  print i, time[i]
+#                  print i, time[i]
                else:
                   dis=[]
                   for j in clusterCenters:
                       dis.append(euclidMat[j][i])
                   if 0. not in dis:
-                     print i, j, time[i], dis
+#                     print i, j, time[i], dis
                      clusterCenters.append(i)
        
         #print "Found",len(clusterCenters), "cluster centers"
@@ -869,9 +894,81 @@ def clustering(time,values,iteration,parameters):
     print outliers_forward
     return clusters_forward,outliers_forward
 
-      
-          
 
+def save_clusters(parameters,clusters,iteration):
+    if parameters['md_engine']=='GROMACS':
+       trr='totaltraj.trr'
+       tpr=parameters['tpr']
+       ndx=parameters['ndx']
+       gmx=parameters['gmx_path']
+       for time in clusters.keys():
+           time=str(int(float(time)))
+           nameOut='center_'+time+'.pdb'
+           if not os.path.isfile(nameOut): # the time of each center should be the same since we are combining iterations
+              cmd=gmx+' trjconv -f '+trr+' -s '+tpr+' -n '+ndx+' -b '+str(int(time))+' -e '+str(int(time))+\
+                  ' -pbc mol -ur compact -center -o '+nameOut+'<<OUT\n3\n0\n'
+              os.system(cmd)
+           
+
+def generate_restarts(clusters,outliers,iteration,parameters):
+
+    # Generate an inverted distribution for taboo search.
+    # Every cluster/outlier will be given a normalised weight 
+    # inverse to the weight in the real distribution (cite paper)
+    all_clust={}
+
+    # Combine clusters and outliers and calculate the total number of snapshots
+    num_snaps=0
+    for key in clusters.keys():
+        all_clust[key]=clusters[key]
+        num_snaps=num_snaps+len(all_clust[key])
+    for key in outliers.keys():
+        all_clust[key]=outliers[key]
+        num_snaps=num_snaps+len(all_clust[key])
+
+    # Assign to each cluster/outlier weight equal to the inverse of their statistical distribution
+    inv_weights={}
+    sum_inv_weights=0
+    for key in all_clust.keys():
+        inv_weights[key]=float(num_snaps)/float(len(all_clust[key]))
+        sum_inv_weights=sum_inv_weights+inv_weights[key]
+#        print "cluster "+str(key)+" has an inverse weight of "+str(inv_weights[key])
+#    print  "the sum of inverse weights is: "+str(sum_inv_weights)
+
+    # Normalise the inverse weights and draw times
+    norm_weights={}
+    for key in inv_weights.keys():
+        norm_weights[key]=inv_weights[key]/float(sum_inv_weights)
+#        print "cluster "+str(key)+" has a normalised weight of "+str(norm_weights[key])
+
+    if len(inv_weights.keys())>=int(parameters['nsim']):
+       times_restarts=numpy.random.choice(a=norm_weights.keys(),p=norm_weights.values(),size=int(parameters['nsim']),replace=False)
+    else:
+       rest=int(parameters['nsim'])-len(inv_weights.keys())
+       times_restarts=numpy.random.choice(a=norm_weights.keys(),p=norm_weights.values(),size=len(inv_weights.keys()),replace=False)
+       numpy.append(times_restarts, numpy.random.choice(a=norm_weights.keys(),p=norm_weights.values(),size=rest,replace=False))
+    
+    if parameters['md_engine']=='GROMACS':
+
+       gmx=parameters['gmx_path']
+       trr='totaltraj.trr'
+       tpr=parameters['tpr']
+       ndx=parameters['ndx']
+       top=parameters['top']
+       mdp=parameters['mdp']
+
+       rep=0
+       for instant in times_restarts:
+           time_str=str(int(float(instant)))
+           gro='restart'+str(iteration)+'_'+time_str+'.gro'
+           cmd=gmx+' trjconv -f '+trr+' -s '+tpr+' -n '+ndx+' -b '+str(int(time_str))+' -e '+str(int(time_str))+' -o '+gro+'<<EOF\n0\n'
+           os.system(cmd)
+           cmd=gmx+' grompp -f '+mdp+' -c '+gro+' -p '+top+' -n '+ndx+' -o '+'iteration'+str(iteration+1)+str(rep)+'.tpr'
+           os.system(cmd)
+           rep=rep+1
+           os.system('rm restart*gro *mdout*')
+    
+        
 
 if __name__ == '__main__':
 
@@ -906,3 +1003,5 @@ if __name__ == '__main__':
         qsub_md=submit_calc(parameters,iteration)  
         cv_arr,metric_arr,time=combine_trajectories(iteration,parameters)
         clusters,outliers=clustering(time,metric_arr,iteration,parameters) 
+        save_clusters(parameters,clusters,iteration)
+        generate_restarts(clusters,outliers,iteration,parameters)
