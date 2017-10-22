@@ -6,7 +6,7 @@ q_time=48:00:00
 #GENERAL PARAMETERS
 ngpu=2
 nthreads=40
-max_iter=10000
+max_iter=2
 target=2G8N_equil.pdb
 
 #PLUMED FILES
@@ -19,7 +19,6 @@ stride=1250
 bias=LOWER_WALLS
 at_cv=7.3
 at_metric=10
-mts=4
 
 #GENERAL FILES
 reference_structure=1HNN.pdb
