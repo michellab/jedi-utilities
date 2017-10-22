@@ -19,7 +19,6 @@ stride=1250
 bias=LOWER_WALLS
 at_cv=7.3
 at_metric=10
-mts=4
 
 #GENERAL FILES
 reference_structure=1HNN.pdb
@@ -33,6 +32,7 @@ ndx=1HNN_index.ndx
 ntomp=10
 simtime=50 # Simulation time for each replica in ps
 dt=0.004 # MD time step 
+mts=4
 
 #CLUSTERING PARAMETERS
 clustering=density_Laio

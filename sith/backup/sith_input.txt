@@ -6,7 +6,7 @@ q_time=48:00:00
 #GENERAL PARAMETERS
 ngpu=2
 nthreads=40
-max_iter=2
+max_iter=10000
 target=2G8N_equil.pdb
 
 #PLUMED FILES
@@ -32,6 +32,7 @@ ndx=1HNN_index.ndx
 ntomp=10
 simtime=50 # Simulation time for each replica in ps
 dt=0.004 # MD time step 
+mts=4
 
 #CLUSTERING PARAMETERS
 clustering=density_Laio

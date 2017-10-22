@@ -1143,11 +1143,11 @@ if __name__ == '__main__':
     max_iter=int(parameters['max_iter'])
     for iteration in range(st_iter,max_iter):
         if iteration>0:
-           include, clusters_hist=build_metric_bias(parameters,include,outliers,outliers,metric_arr,\
+           include, clusters_hist=build_metric_bias(parameters,include,clusters,outliers,metric_arr,\
                                                     iteration,metric_input,clusters_hist,time)
 
         taboo_plumedat=gen_plumed_input(parameters,include,clusters_hist)
-        print "Iteration "+str(iteration)+" will be submitted to the queue."
+        print "Iteration "+str(iteration)+" is going to be submitted."
         qsub_md=submit_calc(parameters,iteration)  
         cv_arr,metric_arr,time=combine_trajectories(iteration,parameters)
         clusters,outliers=clustering(time,metric_arr,iteration,parameters) 
