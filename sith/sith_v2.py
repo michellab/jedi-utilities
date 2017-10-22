@@ -1147,8 +1147,8 @@ if __name__ == '__main__':
                                                     iteration,metric_input,clusters_hist,time)
 
         taboo_plumedat=gen_plumed_input(parameters,include,clusters_hist)
+        print "Iteration "+str(iteration)+" will be submitted to the queue."
         qsub_md=submit_calc(parameters,iteration)  
-        print "Iteration "+str(iteration)+" was just submitted."
         cv_arr,metric_arr,time=combine_trajectories(iteration,parameters)
         clusters,outliers=clustering(time,metric_arr,iteration,parameters) 
         save_clusters(parameters,clusters,iteration)
