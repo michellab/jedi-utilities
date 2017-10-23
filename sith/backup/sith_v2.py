@@ -30,12 +30,15 @@ parser = argparse.ArgumentParser(description="Perform an iterative taboo search 
 #
 parser.add_argument('-i','--input', nargs="?",
                     help='input file')
+parser.add_argument('-d','--debug',action='store_true',
+                    help='Do not remove any files (rename them if necessary)')
 
 
 # Get all the parameters from the input file
 def parse(parser):
 
     args = parser.parse_args()
+    print args.debug
     if args.input is None:
         parser.print_help()
         print ("""@@@
@@ -50,6 +53,10 @@ ERROR ! The input cannot be found. See usage above.
         sys.exit(-1)
     else:
         parameters={}
+        if args.debug is True:
+           parameters['debug']=True
+        else:
+           parameters['debug']=False
         filein=open(args.input,'r')
         for line in filein:
             if line.startswith('#') or line=="\n":
@@ -645,7 +652,7 @@ def gen_plumed_input(parameters,include,clusters_hist):
 
     for time in clusters_hist:
         time_str=str(int(time))
-        line='INCLUDE FILE=dist_metric_'+time_str+'\n'
+        line='INCLUDE FILE=dist_metric_'+time_str+'.dat\n'
         fileout.write(line)
 
 
@@ -761,8 +768,8 @@ def submit_calc(parameters,iteration):
     if q_system=='slurm':
       line='#!/bin/bash\n'
       line=line+'#SBATCH --job-name=iteration'+str(iteration)+'\n'
-      line=line+'#SBATCH -o iteration'+str(iteration)+'.out\n'
-      line=line+'#SBATCH -e iteration'+str(iteration)+'.err\n'
+      line=line+'#SBATCH -o iter'+str(iteration)+'.out\n'
+      line=line+'#SBATCH -e iter'+str(iteration)+'.err\n'
       line=line+'#SBATCH -p '+q_name+'\n'
       line=line+'#SBATCH -n '+str(parameters['nthreads'])+'\n'
       line=line+'#SBATCH -N 1\n' # request entire node
@@ -817,8 +824,9 @@ def combine_trajectories(iteration,parameters):
           os.system(cmd)
        cmd='mv iteration'+str(iteration)+'.trr totaltraj.trr'
        os.system(cmd)
-       cmd='rm iteration'+str(iteration)+'*'
-       os.system(cmd)
+       if parameters['debug']==False:
+          cmd='rm iteration'+str(iteration)+'*'
+          os.system(cmd)
        
     # Combine PLUMED COLVAR files
     totalplumed='COLVAR'
@@ -831,8 +839,9 @@ def combine_trajectories(iteration,parameters):
        os.system(cmd)
        cmd='mv tmp.cv '+totalplumed
        os.system(cmd)
-    cmd='rm COLVAR.*'
-    os.system(cmd)
+    if parameters['debug']==False:
+       cmd='rm COLVAR.*'
+       os.system(cmd)
     
     time,metric_list_val,cv_list_val,metric_avg,metric_sd,cv_avg,cv_sd=analyse_plumed_output(parameters,'COLVAR',iteration)
     
@@ -1049,7 +1058,7 @@ def generate_restarts(clusters,outliers,iteration,parameters):
     else:
        rest=int(parameters['nsim'])-len(inv_weights.keys())
        times_restarts=numpy.random.choice(a=norm_weights.keys(),p=norm_weights.values(),size=len(inv_weights.keys()),replace=False)
-       numpy.append(times_restarts, numpy.random.choice(a=norm_weights.keys(),p=norm_weights.values(),size=rest,replace=False))
+       times_restarts=numpy.append(times_restarts, numpy.random.choice(a=norm_weights.keys(),p=norm_weights.values(),size=rest,replace=False))
     
     if parameters['md_engine']=='GROMACS':
 
@@ -1064,12 +1073,14 @@ def generate_restarts(clusters,outliers,iteration,parameters):
        for instant in times_restarts:
            time_str=str(int(float(instant)))
            gro='restart'+str(iteration)+'_'+time_str+'.gro'
-           cmd=gmx+' trjconv -f '+trr+' -s '+tpr+' -n '+ndx+' -b '+str(int(time_str))+' -e '+str(int(time_str))+' -o '+gro+'<<EOF\n0\n'
-           os.system(cmd)
+           if not os.path.isfile(gro):
+              cmd=gmx+' trjconv -f '+trr+' -s '+tpr+' -n '+ndx+' -b '+str(int(time_str))+' -e '+str(int(time_str))+' -o '+gro+'  <<EOF\n0\n'
+              os.system(cmd)
            cmd=gmx+' grompp -f '+mdp+' -c '+gro+' -p '+top+' -n '+ndx+' -o '+'iteration'+str(iteration+1)+str(rep)+'.tpr'
            os.system(cmd)
            rep=rep+1
-           os.system('rm restart*gro *mdout*')
+       if parameters['debug']==False:
+          os.system('rm restart*gro *mdout*')
     
 def calc_avg(iteration,time,clusters,cv_arr,metric_arr,metricAvgTarget,metricSDTarget,cvAvgTarget,cvSDTarget):
     
