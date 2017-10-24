@@ -23,6 +23,7 @@ import argparse
 import mdtraj
 import numpy, scipy, math
 import glob, os, sys
+import time as tiempo
 
 parser = argparse.ArgumentParser(description="Perform an iterative taboo search using the JEDI collective variable",
                                  epilog="sith.py is distributed under a GPL license.",
@@ -180,14 +181,21 @@ ERROR ! The input cannot be found. See usage above.
     # Getting info to restart in case of crash:
     if 'st_iter' not in parameters.keys():
         parameters['st_iter']=0
+    elif int(parameters['st_iter'])!=0:
+        print "Restarting function has still to be debugged. Do NOT use. Exiting"
+        sys.exit()
     if 'clusters_hist' not in parameters.keys(): #history of sampled clusters
-        parameters['clusters_hist']=[]
+        parameters['clusters_hist']={}
     else:
+        print "Restarting function has still to be debugged. Do NOT use. Exiting"
+        sys.exit()
         parameters['clusters_hist']=parameters['clusters_hist'].split(',') 
 
     if 'include' not in parameters.keys():
         parameters['include']=[]
     else:
+        print "Restarting function has still to be debugged. Do NOT use. Exiting"
+        sys.exit()
         parameters['include']=parameters['include'].split(',')
         for bias in parameters['include']:
             if not os.path.isfile(bias):
@@ -229,17 +237,40 @@ def setup_queue(parameters):
        print "Error: The queue name must be specified with option 'q_name='. Exiting."
        sys.exit()
     
-       if 'q_time' not in parameters.keys():
-          print "Error: The time a job can stay in the queue must be specified with option 'q_time='. Exiting."
-          sys.exit()
+    if 'q_time' not in parameters.keys():
+        print "Maximum time for the job was not specified. Setting it to 24 hours."
+        parameters['q_time']="24:00:00"
     
     if parameters['q_system']=='slurm':
+       print "Setting up que jobs for slurm"
        if 'sbatch' not in parameters.keys(): 
           parameters['sbatch']='/usr/local/bin/sbatch'
           print "looking for sbatch in /usr/local/bin/sbatch"
        if not os.path.isfile(parameters['sbatch']):
           print "Error: "+parameters['sbatch']+" not found. Exiting." 
           sys.exit()
+
+    if parameters['q_system']=='archer':
+       print "Setting up que jobs for ARCHER."
+       print "If specified, the variable nthreads will be overriden woith 24 times \
+              the number of nodes to be used"
+       if 'num_nodes' not in parameters.keys():
+          print "Number of nodes was not selected. Setting it to 1"
+          parameters['num_nodes']=1
+       num_nodes=int(parameters['num_nodes'])
+       nthreads=num_nodes*24
+       parameters['nthreads']=nthreads
+       if 'budget' not in parameters.keys():
+           print "Budget code needs to be specified with option 'budget='. Exiting."
+           sys.exit()
+       
+       if 'qsub' not in parameters.keys():
+          print "looking for qsub in /opt/pbs/12.2.401.141761/bin/qsub"
+          parameters['qsub']='/opt/pbs/12.2.401.141761/bin/qsub'
+          
+           
+
+       
 
     return parameters
 
@@ -250,14 +281,14 @@ def genEnVar(parameters):
         parameters['max_iter']=1000
 
     if 'nthreads' not in parameters.keys():
-        print "The number of available cores has to be specified with option 'nthreads='. Exiting"
-        sys.exit()
+        print "The number of available cores was not specified. Setting it to 1."
+        parameters['nthreads']='1'
     if 'ngpu' not in parameters.keys():
         print "The number of available gpus has to be specified with option 'ngpu='. Exiting"
         sys.exit()
     if 'ntomp' not in parameters.keys():
-        print "The number of cores to be used in each replica has to be specified with option 'ntomp='. Exiting"
-        sys.exit()
+        print "The number of cores to be used in each replica was not specified. Setting it to 1."
+        parameters['ntomp']='1'
     
 
     nthreads=parameters['nthreads']
@@ -265,6 +296,10 @@ def genEnVar(parameters):
     ngpu=parameters['ngpu']
     nsim=int(int(nthreads)/int(ntomp))
     parameters['nsim']=nsim
+    if int(nthreads)<int(ntomp) or int(nthreads)%int(ntomp)!=0:
+       print "The number of available cores has to be equal or bigger than and a multiple of the number"
+       print "of cores to be used in each replica. Exiting"
+       sys.exit()
     if int(ngpu)!=0:
        if nsim%int(ngpu)!=0:
           print "The number of simulations has to be a multiple of the number of GPUS for MPI related reasons." 
@@ -650,10 +685,15 @@ def gen_plumed_input(parameters,include,clusters_hist):
        line='res_cv: LOWER_WALLS ARG=cv AT='+str(at_cv)+' KAPPA='+str(kappa_cv)+' STRIDE='+str(mts_cv)+'\n'
        fileout.write(line)
 
-    for time in clusters_hist:
-        time_str=str(int(time))
-        line='INCLUDE FILE=dist_metric_'+time_str+'.dat\n'
-        fileout.write(line)
+    used_times=[]
+    for it in clusters_hist.keys():
+        for instant in clusters_hist[it]:
+            if instant in used_times:
+               continue
+            time_str=str(int(instant))
+            line='INCLUDE FILE=dist_metric_'+time_str+'.dat\n'
+            fileout.write(line)
+            used_times.append(instant)
 
 
     for bias in include:
@@ -681,9 +721,9 @@ def build_metric_bias(parameters,include,clusters,outliers,metric_arr,iteration,
     if len(clusters.keys())==0:
        return include, clusters_hist
     else:
+       clusters_hist[iteration]=[]
        for key in clusters.keys():
-           if key not in clusters_hist:
-              clusters_hist.append(key)
+              clusters_hist[iteration].append(key)
 
     all_clust={}
 
@@ -714,40 +754,46 @@ def build_metric_bias(parameters,include,clusters,outliers,metric_arr,iteration,
 
     if parameters['metric']=="SC_TORSION":
 
-       for time_center in clusters_hist: 
-           time_str=str(int(time_center))
-           nameOut="dist_metric_"+time_str+".dat"
-           if os.path.isfile(nameOut):
-              continue
-           fileout=open(nameOut,'w')
-           time_index=numpy.where(time==time_center)[0][0]
-           labelstemp=[]
-           loc=0
-           for key in metric_input.keys(): 
-               line='sin_'+key+'_'+time_str+': MATHEVAL ARG='+key+' FUNC=sin(x)-'+\
-                    metric_arr[time_index][loc].astype(str)+' PERIODIC=NO'+'\n'
-               #print line
-               fileout.write(line)
-               loc += 1
-               labelstemp.append('sin_'+key+'_'+time_str)
-               line='cos_'+key+'_'+time_str+': MATHEVAL ARG='+key+' FUNC=cos(x)-'+\
-                    metric_arr[time_index][loc].astype(str)+' PERIODIC=NO'+'\n'
-               fileout.write(line)
-               #print line
-               loc += 1
-               labelstemp.append('cos_'+key+'_'+time_str)
-           line='dist2_'+time_str+': COMBINE ARG='+','.join(labelstemp)+\
+       used_times=[]
+       for it in clusters_hist.keys(): 
+           for time_center in clusters_hist[it]: 
+               if time_center in used_times:
+                  continue
+               time_str=str(int(time_center))
+               nameOut="dist_metric_"+time_str+".dat"
+               if os.path.isfile(nameOut):
+                  continue
+               fileout=open(nameOut,'w')
+               time_index=numpy.where(time==time_center)[0][0]
+               labelstemp=[]
+               loc=0
+               for key in metric_input.keys(): 
+                   line='sin_'+key+'_'+time_str+': MATHEVAL ARG='+key+' FUNC=sin(x)-'+\
+                         metric_arr[time_index][loc].astype(str)+' PERIODIC=NO'+'\n'
+                   #print line
+                   fileout.write(line)
+                   loc += 1
+                   labelstemp.append('sin_'+key+'_'+time_str)
+                   line='cos_'+key+'_'+time_str+': MATHEVAL ARG='+key+' FUNC=cos(x)-'+\
+                         metric_arr[time_index][loc].astype(str)+' PERIODIC=NO'+'\n'
+                   fileout.write(line)
+                   #print line
+                   loc += 1
+                   labelstemp.append('cos_'+key+'_'+time_str)
+               line='dist2_'+time_str+': COMBINE ARG='+','.join(labelstemp)+\
                 ' POWERS='+','.join(['2']*len(metric_arr[time_index]))+' PERIODIC=NO\n'
-           fileout.write(line)
-           line='dist_'+time_str+': MATHEVAL ARG=dist2_'+time_str+' FUNC=sqrt(x) PERIODIC=NO'
-           fileout.write(line)
-           fileout.close()
+               fileout.write(line)
+               line='dist_'+time_str+': MATHEVAL ARG=dist2_'+time_str+' FUNC=sqrt(x) PERIODIC=NO'
+               fileout.write(line)
+               fileout.close()
+               used_times.append(time_center)
 
     if parameters['bias']=='LOWER_WALLS' or parameters['bias']=='UPPER_WALLS' or parameters['bias']=='RESTRAINT':
 
        nameOut='metric_bias.'+str(iteration)+'.dat'
        fileout=open(nameOut,'w')
-       for time_center in clusters_hist:
+       for time_center in clusters_hist[iteration]:
+           time_str=str(int(time_center))
            line= line='rest_'+time_str+'_'+str(iteration)+': '+parameters['bias']+' ARG=dist_'+time_str+\
                  ' AT='+str(clusdist_avg)+' KAPPA='+str(parameters['kappa_metric'])+'\n'
            fileout.write(line)
@@ -767,7 +813,7 @@ def submit_calc(parameters,iteration):
 
     if q_system=='slurm':
       line='#!/bin/bash\n'
-      line=line+'#SBATCH --job-name=iteration'+str(iteration)+'\n'
+      line=line+'#SBATCH --job-name=iter'+str(iteration)+'\n'
       line=line+'#SBATCH -o iter'+str(iteration)+'.out\n'
       line=line+'#SBATCH -e iter'+str(iteration)+'.err\n'
       line=line+'#SBATCH -p '+q_name+'\n'
@@ -777,6 +823,15 @@ def submit_calc(parameters,iteration):
          line=line+'#SBATCH --gres=gpu:'+str(parameters['ngpu'])+'\n'
       line=line+'#SBATCH --time '+parameters['q_time']+'\n'
       fileout.write(line)
+    elif q_system=='archer':
+      line='#!/bin/bash --login\n'
+      line=line+'#PBS -l select='+str(parameters['num_nodes'])+'\n'
+      line=line+'#PBS -N iter'+str(iteration)+'\n'
+      line=line+'#PBS -A '+parameters['budget']+'\n'
+      line=line+'#PBS -l walltime='+parameters['q_time']+'\n'
+      line=line+'#PBS -q '+q_name+'\n\n'
+      line=line+'export OMP_NUM_THREADS='+str(parameters['ntomp'])+'\n'
+      line=line+'cd $PBS_O_WORKDIR\n'
 
     if parameters['md_engine']=='GROMACS':
        if iteration==0:
@@ -797,9 +852,11 @@ def submit_calc(parameters,iteration):
     if q_system=='slurm':
        cmd=parameters['sbatch']+' '+nameOut
        os.system(cmd)
-    
-    while not os.path.isfile('calculation_finished.ok'): # the program will loop here until it finds te calculation_finished.ok file
-       continue 
+
+    isfi=os.path.isfile('calculation_finished.ok')    
+    while isfi==False: # the program will loop here until it finds te calculation_finished.ok file
+      tiempo.sleep(1) 
+      isfi=os.path.isfile('calculation_finished.ok')
     os.system('rm calculation_finished.ok')
 
      
@@ -809,6 +866,8 @@ def combine_trajectories(iteration,parameters):
        # Combine MD files
        totaltraj="totaltraj.trr"
        trajs=glob.glob('iteration'+str(iteration)+'*.trr')
+       print glob.glob('iteration'+str(iteration)+'*.trr')
+       print trajs
        fileout=open('c.txt','w')
        c_len=len(trajs)
        if os.path.isfile(totaltraj):
@@ -1070,15 +1129,21 @@ def generate_restarts(clusters,outliers,iteration,parameters):
        mdp=parameters['mdp']
 
        rep=0
+       nameOut="restarts_iteration"+str(iteration+1)+".txt"
+       fileout=open(nameOut,'w')
+
        for instant in times_restarts:
            time_str=str(int(float(instant)))
            gro='restart'+str(iteration)+'_'+time_str+'.gro'
+           line="Replica "+str(rep)+" of Iteration "+str(iteration+1)+" will be started from the snapshot at "+time_str+" ps.\n"
+           fileout.write(line)
            if not os.path.isfile(gro):
               cmd=gmx+' trjconv -f '+trr+' -s '+tpr+' -n '+ndx+' -b '+str(int(time_str))+' -e '+str(int(time_str))+' -o '+gro+'  <<EOF\n0\n'
               os.system(cmd)
            cmd=gmx+' grompp -f '+mdp+' -c '+gro+' -p '+top+' -n '+ndx+' -o '+'iteration'+str(iteration+1)+str(rep)+'.tpr'
            os.system(cmd)
            rep=rep+1
+       fileout.close()
        if parameters['debug']==False:
           os.system('rm restart*gro *mdout*')
     
@@ -1161,7 +1226,9 @@ if __name__ == '__main__':
         print "Iteration "+str(iteration)+" is going to be submitted."
         qsub_md=submit_calc(parameters,iteration)  
         cv_arr,metric_arr,time=combine_trajectories(iteration,parameters)
-        clusters,outliers=clustering(time,metric_arr,iteration,parameters) 
+        clusters,outliers=clustering(time,metric_arr,iteration,parameters)
+        if parameters['debug']==True:
+           clusters=outliers
         save_clusters(parameters,clusters,iteration)
         if parameters['target'] is not None:
            calc_avg(iteration,time,clusters,cv_arr,metric_arr,metricAvgTarget,metricSDTarget,cvAvgTarget,cvSDTarget)

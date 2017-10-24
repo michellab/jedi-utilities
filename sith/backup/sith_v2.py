@@ -794,7 +794,7 @@ def build_metric_bias(parameters,include,clusters,outliers,metric_arr,iteration,
        fileout=open(nameOut,'w')
        for time_center in clusters_hist[iteration]:
            time_str=str(int(time_center))
-           line= line='rest_'+time_str+'_'+str(it)+': '+parameters['bias']+' ARG=dist_'+time_str+\
+           line= line='rest_'+time_str+'_'+str(iteration)+': '+parameters['bias']+' ARG=dist_'+time_str+\
                  ' AT='+str(clusdist_avg)+' KAPPA='+str(parameters['kappa_metric'])+'\n'
            fileout.write(line)
        fileout.close()
