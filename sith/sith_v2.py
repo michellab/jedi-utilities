@@ -212,9 +212,15 @@ ERROR ! The input cannot be found. See usage above.
         print "Supported clustering methods are: "+','.join(supported_clusterings)+". Exiting."
         sys.exit()
     if parameters['clustering']=='density_Laio':
+       print "Clustering method selected is the density method by Rodriguez and Laio (Science (2014), 344(6191) 1492-1496)"
+       d0_methods=['avg-2sd','avg-sd','avg']
        if 'cluster_dc' not in parameters.keys():
           print "The value for dc or a way to calculate it has not been specified. Will use d0=euclidMat_avg-2*euclidMat_sd"
           parameters['cluster_dc']='avg-2sd'
+       elif parameters['cluster_dc'] not in d0_methods:
+          print "The method to calculate dc is not supported."
+          print "Currently supported methods are: "+','.join(d0_methods)+". exiting"
+          sys.exit()
     
     if 'sampltime' not in parameters.keys():
         print "The time in ps for which a populated cluster has to be sampled must be defined with option 'sampltime='. Exiting."
@@ -401,16 +407,15 @@ def getMetric(parameters):
     return parameters
 
 def getBias(prameters):
-    supported_biases=['RESTRAINT','LOWER_WALLS','UPPER_WALLS']
+    supported_biases=['RESTRAINT','LOWER_WALLS','UPPER_WALLS','MOVINGRESTRAINT_L']
     if 'bias' not in parameters.keys():
-       print "ERROR: You must define a biasing method with the option 'bias='. Exiting"
-       sys.exit()
+       print "CV biasing method was not chosen. It is not going to be biased."
+       parameters['bias']=None
     elif parameters['bias'] not in supported_biases:
        print "ERROR: biasing method '"+parameters['bias']+"' is not supported."
        print "Supported biasing methods are: "+','.join(supported_biases)+". Exiting."
        sys.exit()
-    else:
-       bias=parameters['bias']
+    bias=parameters['bias']
     
     if 'mts_cv' not in parameters.keys():
        print "Stride for multiple time step in biasing force calculation for CV not specified. Setting it to 1."
@@ -419,14 +424,14 @@ def getBias(prameters):
        print "Stride for multiple time step in biasing force calculation in metric not specified. Setting it to 1."
        parameters['mts_metric']=1
 
-    if bias=='RESTRAINT' or  bias=='LOWER_WALLS' or bias=='UPPER_WALLS':
+    if bias=='RESTRAINT' or  bias=='LOWER_WALLS' or bias=='UPPER_WALLS' or bias=='MOVINGRESTRAINT_L':
        if 'at_cv' not in parameters.keys():
            print "ERROR: You must define an equilibrium value for your CV with option 'at_cv='. Exiting"
        if 'kappa_cv' not in parameters.keys():
            print "KAPPA for CV not specified. setting it to 100 kJ/(mol*(nm**2))"
            parameters['kappa_cv']=100
        if 'at_metric' not in parameters.keys():
-           print "ERROR: You must define an equilibrium value for your metirc with option 'at_metric='. Exiting"
+           print "ERROR: You must define an equilibrium value for your metric with option 'at_metric='. Exiting"
        if 'kappa_metric' not in parameters.keys():
            print "KAPPA for metric not specified. setting it to 100 kJ/(mol*(nm**2))"
            parameters['kappa_metric']=100
@@ -449,8 +454,10 @@ def setupMetric(parameters):
           sys.exit()
        else:
           structure=parameters['reference_structure']
-
-       if cv=='JEDI':
+ 
+       if parameters['SC_list'] is not None:
+          residues_str=parameters['SC_list'].split(',')
+       elif cv=='JEDI':
           apolar=parameters['apolar']
           polar=parameters['polar']
 
@@ -462,78 +469,79 @@ def setupMetric(parameters):
                   if str(res) not in residues_str and "GLY" not in str(res):
                      residues_str.append(str(res))
                      residues.append(res)
-          print "There are", len(residues_str), "residues in the defined binding site (which could be the whole protein!)"
+
+       print "The residues that are going to be taken into account are:"
+       print residues_str
+       print "There are", len(residues_str), "residues in the defined binding site (which could be the whole protein!)"
           
-          struct=mdtraj.load_pdb(structure)
+       struct=mdtraj.load_pdb(structure) 
           
+       chi={}
           
+       for i in range(0,len(mdtraj.compute_chi1(struct)[0])):
+           atoms=[]
+           for atom in mdtraj.compute_chi1(struct)[0][i]:
+               for at2 in struct.topology.atoms:
+                   if int(at2.index)==atom and str(at2.residue) in residues_str:
+                      atoms.append(str(atom+1)) # +1 because they start at 0 in mdtraj but at 1 in GROMACS
+                      name='chi1_'+str(at2.residue)
+           if len(atoms)==4:
+              chi[name]=atoms
+           elif len(atoms)!=0:
+              print "something went wrong when assigning dihedrals. A dihedral can't have a number of atoms different than 4"
+              break
 
-          chi={}
-          
-          for i in range(0,len(mdtraj.compute_chi1(struct)[0])):
-              atoms=[]
-              for atom in mdtraj.compute_chi1(struct)[0][i]:
-                  for at2 in struct.topology.atoms:
-                      if int(at2.index)==atom and str(at2.residue) in residues_str:
-                         atoms.append(str(atom+1)) # +1 because they start at 0 in mdtraj but at 1 in GROMACS
-                         name='chi1_'+str(at2.residue)
-              if len(atoms)==4:
-                 chi[name]=atoms
-              elif len(atoms)!=0:
-                 print "something went wrong when assigning dihedrals. A dihedral can't have a number of atoms different than 4"
-                 break
+       for i in range(0,len(mdtraj.compute_chi2(struct)[0])):
+           atoms=[]
+           for atom in mdtraj.compute_chi2(struct)[0][i]:
+               for at2 in struct.topology.atoms:
+                   if int(at2.index)==atom and str(at2.residue) in residues_str:
+                     atoms.append(str(atom+1)) # +1 because they start at 0 in mdtraj but at 1 in GROMACS
+                     name='chi2_'+str(at2.residue)
+           if len(atoms)==4:
+              chi[name]=atoms
+           elif len(atoms)!=0:
+              print "something went wrong when assigning dihedrals. A dihedral can't have a number of atoms different than 4"
+              break
 
-          for i in range(0,len(mdtraj.compute_chi2(struct)[0])):
-              atoms=[]
-              for atom in mdtraj.compute_chi2(struct)[0][i]:
-                  for at2 in struct.topology.atoms:
-                      if int(at2.index)==atom and str(at2.residue) in residues_str:
-                         atoms.append(str(atom+1)) # +1 because they start at 0 in mdtraj but at 1 in GROMACS
-                         name='chi2_'+str(at2.residue)
-              if len(atoms)==4:
-                 chi[name]=atoms
-              elif len(atoms)!=0:
-                 print "something went wrong when assigning dihedrals. A dihedral can't have a number of atoms different than 4"
-                 break
+       for i in range(0,len(mdtraj.compute_chi3(struct)[0])):
+           atoms=[]
+           for atom in mdtraj.compute_chi3(struct)[0][i]:
+               for at2 in struct.topology.atoms:
+                   if int(at2.index)==atom and str(at2.residue) in residues_str:
+                      atoms.append(str(atom+1)) # +1 because they start at 0 in mdtraj but at 1 in GROMACS
+                      name='chi3_'+str(at2.residue)
+           if len(atoms)==4:
+              chi[name]=atoms
+           elif len(atoms)!=0:
+              print "something went wrong when assigning dihedrals. A dihedral can't have a number of atoms different than 4"
+              break
 
-          for i in range(0,len(mdtraj.compute_chi3(struct)[0])):
-              atoms=[]
-              for atom in mdtraj.compute_chi3(struct)[0][i]:
-                  for at2 in struct.topology.atoms:
-                      if int(at2.index)==atom and str(at2.residue) in residues_str:
-                         atoms.append(str(atom+1)) # +1 because they start at 0 in mdtraj but at 1 in GROMACS
-                         name='chi3_'+str(at2.residue)
-              if len(atoms)==4:
-                 chi[name]=atoms
-              elif len(atoms)!=0:
-                 print "something went wrong when assigning dihedrals. A dihedral can't have a number of atoms different than 4"
-                 break
+       for i in range(0,len(mdtraj.compute_chi4(struct)[0])):
+           atoms=[]
+           for atom in mdtraj.compute_chi4(struct)[0][i]:
+               for at2 in struct.topology.atoms:
+                   if int(at2.index)==atom and str(at2.residue) in residues_str:
+                      atoms.append(str(atom+1)) # +1 because they start at 0 in mdtraj but at 1 in GROMACS
+                      name='chi4_'+str(at2.residue)
+           if len(atoms)==4:
+              chi[name]=atoms
+           elif len(atoms)!=0:
+              print "something went wrong when assigning dihedrals. A dihedral can't have a number of atoms different than 4"
+              break
 
-          for i in range(0,len(mdtraj.compute_chi4(struct)[0])):
-              atoms=[]
-              for atom in mdtraj.compute_chi4(struct)[0][i]:
-                  for at2 in struct.topology.atoms:
-                      if int(at2.index)==atom and str(at2.residue) in residues_str:
-                         atoms.append(str(atom+1)) # +1 because they start at 0 in mdtraj but at 1 in GROMACS
-                         name='chi4_'+str(at2.residue)
-              if len(atoms)==4:
-                 chi[name]=atoms
-              elif len(atoms)!=0:
-                 print "something went wrong when assigning dihedrals. A dihedral can't have a number of atoms different than 4"
-                 break
-
-          fileout=open('metric.dat','w')
-          for key in chi.keys():
-              line=key+': TORSION ATOMS='+','.join(chi[key])+'\n'
-              fileout.write(line)
-              line='sin_'+key+': MATHEVAL ARG='+key+' FUNC=sin(x) PERIODIC=NO'+'\n'
-              fileout.write(line)
-              line='cos_'+key+': MATHEVAL ARG='+key+' FUNC=cos(x) PERIODIC=NO'+'\n'
-              fileout.write(line)
-          fileout.close()
-          print "The sines and cosines of "+str(len(chi.keys()))+ " torsions are going to be used as a metric."
-          print "This is a total of "+str(2*len(chi.keys()))+" variables"
-          return chi
+       fileout=open('metric.dat','w')
+       for key in chi.keys():
+           line=key+': TORSION ATOMS='+','.join(chi[key])+'\n'
+           fileout.write(line)
+           line='sin_'+key+': MATHEVAL ARG='+key+' FUNC=sin(x) PERIODIC=NO'+'\n'
+           fileout.write(line)
+           line='cos_'+key+': MATHEVAL ARG='+key+' FUNC=cos(x) PERIODIC=NO'+'\n'
+           fileout.write(line)
+       fileout.close()
+       print "The sines and cosines of "+str(len(chi.keys()))+ " torsions are going to be used as a metric."
+       print "This is a total of "+str(2*len(chi.keys()))+" variables"
+       return chi
 
           
 def analyse_target(parameters,metric_input):
@@ -646,7 +654,7 @@ def analyse_plumed_output(parameters, nameIn,iteration):
 
     return  time, metric_list_val, cv_list_val, metric_avg, metric_sd, cv_avg, cv_sd
 
-def gen_plumed_input(parameters,include,clusters_hist):
+def gen_plumed_input(parameters,include,clusters_hist,noAdd):
 
     metric=parameters['metric']
     cv=parameters['cv']
@@ -673,22 +681,23 @@ def gen_plumed_input(parameters,include,clusters_hist):
           line=line+' SIGMA='+parameters['metaD_sigma']
        line=line+'\n'
        fileout.write(line)
- 
-    if bias=="LOWER_WALLS":
-       at_cv=parameters['at_cv']
-       kappa_cv=parameters['kappa_cv']
-       mts_cv=parameters['mts_cv']
-       at_metric=parameters['at_metric']
-       kappa_metric=parameters['kappa_metric']
-       mts_metric=parameters['mts_metric']
+    
+    if parameters['debug']==False and bias is not None:
+       if bias=="LOWER_WALLS" or bias=="UPPER_WALLS" or bias=="RESTRAINT" or bias=='MOVINGRESTRAINT_L':
+          at_cv=parameters['at_cv']
+          kappa_cv=parameters['kappa_cv']
+          mts_cv=parameters['mts_cv']
+          at_metric=parameters['at_metric']
+          kappa_metric=parameters['kappa_metric']
+          mts_metric=parameters['mts_metric']
    
-       line='res_cv: LOWER_WALLS ARG=cv AT='+str(at_cv)+' KAPPA='+str(kappa_cv)+' STRIDE='+str(mts_cv)+'\n'
-       fileout.write(line)
+          line='res_cv: LOWER_WALLS ARG=cv AT='+str(at_cv)+' KAPPA='+str(kappa_cv)+' STRIDE='+str(mts_cv)+'\n'
+          fileout.write(line)
 
     used_times=[]
     for it in clusters_hist.keys():
         for instant in clusters_hist[it]:
-            if instant in used_times:
+            if instant in used_times:# or instant in noAdd:
                continue
             time_str=str(int(instant))
             line='INCLUDE FILE=dist_metric_'+time_str+'.dat\n'
@@ -715,7 +724,7 @@ def gen_plumed_input(parameters,include,clusters_hist):
     fileout.write(line)
     fileout.close()
 
-def build_metric_bias(parameters,include,clusters,outliers,metric_arr,iteration,metric_input,clusters_hist,time):
+def build_metric_bias(parameters,include,clusters,outliers,metric_arr,iteration,metric_input,clusters_hist,time,noAdd):
 
     # If there are no polulated clusters, there is no metric bias to be built.
     if len(clusters.keys())==0:
@@ -733,7 +742,7 @@ def build_metric_bias(parameters,include,clusters,outliers,metric_arr,iteration,
         all_clust[key]=outliers[key]
     
     # Calculate the average distance between cluster/outlier centers. Will push away from this
-
+    '''
     clusdist=[]
     if (all_clust.keys())==1:
        clusdist_avg=parameters['at_metric']
@@ -748,7 +757,9 @@ def build_metric_bias(parameters,include,clusters,outliers,metric_arr,iteration,
                 dist=numpy.linalg.norm(metric_arr[time_index1]-metric_arr[time_index2])
                 clusdist.append(dist)
        clusdist_avg=numpy.mean(numpy.array(clusdist).astype(float))
-
+    '''
+    clusdist_avg=parameters['at_metric']
+    
 
     # Build bias file  
 
@@ -757,11 +768,11 @@ def build_metric_bias(parameters,include,clusters,outliers,metric_arr,iteration,
        used_times=[]
        for it in clusters_hist.keys(): 
            for time_center in clusters_hist[it]: 
-               if time_center in used_times:
+               if (time_center in used_times):# or (time_center in noAdd):
                   continue
                time_str=str(int(time_center))
                nameOut="dist_metric_"+time_str+".dat"
-               if os.path.isfile(nameOut):
+               if os.path.isfile(nameOut): #FIXME: Not sure this test is necessary since we are skipping all the times in used_times
                   continue
                fileout=open(nameOut,'w')
                time_index=numpy.where(time==time_center)[0][0]
@@ -788,17 +799,38 @@ def build_metric_bias(parameters,include,clusters,outliers,metric_arr,iteration,
                fileout.close()
                used_times.append(time_center)
 
-    if parameters['bias']=='LOWER_WALLS' or parameters['bias']=='UPPER_WALLS' or parameters['bias']=='RESTRAINT':
 
-       nameOut='metric_bias.'+str(iteration)+'.dat'
-       fileout=open(nameOut,'w')
-       for time_center in clusters_hist[iteration]:
-           time_str=str(int(time_center))
+    openbias=False
+    for time_center in clusters_hist[iteration]:
+        if time_center in noAdd:
+           continue
+        openbias=True
+    if openbias==False:
+       return include,clusters_hist
+
+       
+    nameOut='metric_bias.'+str(iteration)+'.dat'
+    fileout=open(nameOut,'w')
+    for time_center in clusters_hist[iteration]:
+        if time_center in noAdd:
+           continue
+        time_str=str(int(time_center))
+        if parameters['bias']=='LOWER_WALLS' or parameters['bias']=='UPPER_WALLS' or parameters['bias']=='RESTRAINT':
            line= line='rest_'+time_str+'_'+str(iteration)+': '+parameters['bias']+' ARG=dist_'+time_str+\
                  ' AT='+str(clusdist_avg)+' KAPPA='+str(parameters['kappa_metric'])+'\n'
-           fileout.write(line)
-       fileout.close()
-       include.append(nameOut)    
+        elif parameters['bias']=='MOVINGRESTRAINT_L':
+           first=int(parameters['nsteps'])*0.2
+           line='MOVINGRESTRAINT ...\n'+\
+                'ARG=dist_'+time_str+'\n'+\
+                'VERSE=L\n'+\
+                'STEP0=0 AT0=0 KAPPA0='+str(parameters['kappa_metric'])+'\n'+\
+                'STEP1='+str(first)+' AT1='+str(clusdist_avg)+' KAPPA1='+str(parameters['kappa_metric'])+'\n'+\
+                'STEP2='+str(parameters['nsteps'])+' AT2='+str(clusdist_avg)+' KAPPA2='+str(parameters['kappa_metric'])+'\n'+\
+                '... MOVINGRESTRAINT\n'
+        fileout.write(line)
+    fileout.close()
+    include.append(nameOut)
+       
 
     return include,clusters_hist
 
@@ -840,11 +872,13 @@ def submit_calc(parameters,iteration):
              os.system(cmd)
        deffnm='iteration'+str(iteration)
        line=parameters['mpi_exec']+' -n '+str(parameters['nsim'])+' '+\
-            parameters['gmx_path']+' mdrun -ntomp '+str(parameters['ntomp'])+\
+            parameters['gmx_path']+' mdrun -v -ntomp '+str(parameters['ntomp'])+\
             ' -deffnm '+deffnm+' -nsteps '+parameters['nsteps']+' -plumed taboo_bias.dat -multi '+str(parameters['nsim'])+'\n'
        fileout.write(line)
 
-       line='touch calculation_finished.ok' # This is just to check whether the calculation finished or not
+       gettime=tiempo.strftime("%c")
+       name_time=gettime.split()[2]+gettime.split()[1]+gettime.split()[4]+'_'+gettime.split()[3].replace(':','_')
+       line='touch '+name_time # This is just to check whether the calculation finished or not
        fileout.write(line)
     fileout.close()
 
@@ -852,12 +886,14 @@ def submit_calc(parameters,iteration):
     if q_system=='slurm':
        cmd=parameters['sbatch']+' '+nameOut
        os.system(cmd)
-
-    isfi=os.path.isfile('calculation_finished.ok')    
+   
+    isfi=os.path.isfile(name_time)    
     while isfi==False: # the program will loop here until it finds te calculation_finished.ok file
       tiempo.sleep(1) 
-      isfi=os.path.isfile('calculation_finished.ok')
-    os.system('rm calculation_finished.ok')
+      isfi=os.path.isfile(name_time)
+    
+    cmd='rm '+name_time
+    os.system(cmd)
 
      
 def combine_trajectories(iteration,parameters):
@@ -938,6 +974,10 @@ def clustering(time,values,iteration,parameters):
         #calculte rho for each data point
         if parameters['cluster_dc']=='avg-2sd':
            d0=euclidMat_avg-2*euclidMat_sd 
+        elif parameters['cluster_dc']=='avg-sd':
+           d0=euclidMat_avg-euclidMat_sd
+        elif parameters['cluster_dc']=='avg':
+           d0=euclidMat_avg
         
         rho=[]
         for i in range(0,len(values)):
@@ -1063,16 +1103,53 @@ def clustering(time,values,iteration,parameters):
     print clusters_forward
     print "----------------"
     print outliers_forward
-    return clusters_forward,outliers_forward
+
+    # Find clusters that are NOT to be printed nor added to the bias file
+    if parameters['debug']==True:
+       clusters_forward=outliers_forward
+    noAdd=[]
+    for key in clusters_forward.keys():
+        if parameters['bias']=='MOVINGRESTRAINT_L': #FIXME: the whole thing is going to crash quickly...
+           break
+        for time_point in clusters[key]:
+            time_str=str(int(time_point))
+            pattern_bias="rest_"+time_str
+            lst=glob.glob('metric_bias.*.dat')
+            lastit=0
+            if len(lst)==0:
+               continue
+            else:
+               for name_bias in lst:
+                   filein=open(name_bias,'r')
+                   for line in filein:
+                       if ':' not in line:
+                           continue
+                       it=int(line.split(':')[0].split('_')[2])
+                       if it>lastit:
+                          lastit=it
+                   filein.close()
+            diffit=iteration-lastit+1
+            timeSinceLast=diffit*float(parameters['simtime'])*float(parameters['nsim'])
+            print "Time since last iter: "+str(timeSinceLast)
+            print "Minimum time: "+parameters['bias_add_freq']
+            if timeSinceLast<float(parameters['bias_add_freq']):
+               noAdd.append(key)
+               break
+
+        
+
+    return clusters_forward,outliers_forward,noAdd
 
 
-def save_clusters(parameters,clusters,iteration):
+def save_clusters(parameters,clusters,iteration,noAdd):
     if parameters['md_engine']=='GROMACS':
        trr='totaltraj.trr'
        tpr=parameters['tpr']
        ndx=parameters['ndx']
        gmx=parameters['gmx_path']
        for time in clusters.keys():
+           if time in noAdd:
+              continue
            time=str(int(float(time)))
            nameOut='center_'+time+'.pdb'
            if not os.path.isfile(nameOut): # the time of each center should be the same since we are combining iterations
@@ -1090,6 +1167,7 @@ def generate_restarts(clusters,outliers,iteration,parameters):
 
     # Combine clusters and outliers and calculate the total number of snapshots
     num_snaps=0
+
     for key in clusters.keys():
         all_clust[key]=clusters[key]
         num_snaps=num_snaps+len(all_clust[key])
@@ -1117,7 +1195,7 @@ def generate_restarts(clusters,outliers,iteration,parameters):
     else:
        rest=int(parameters['nsim'])-len(inv_weights.keys())
        times_restarts=numpy.random.choice(a=norm_weights.keys(),p=norm_weights.values(),size=len(inv_weights.keys()),replace=False)
-       times_restarts=numpy.append(times_restarts, numpy.random.choice(a=norm_weights.keys(),p=norm_weights.values(),size=rest,replace=False))
+       times_restarts=numpy.append(times_restarts, numpy.random.choice(a=norm_weights.keys(),p=norm_weights.values(),size=rest,replace=True))
     
     if parameters['md_engine']=='GROMACS':
 
@@ -1217,19 +1295,18 @@ if __name__ == '__main__':
     clusters_hist=parameters['clusters_hist'] # list of sampled clusters (in ps)
     st_iter=int(parameters['st_iter'])
     max_iter=int(parameters['max_iter'])
+    noAdd=[]
     for iteration in range(st_iter,max_iter):
         if iteration>0:
            include, clusters_hist=build_metric_bias(parameters,include,clusters,outliers,metric_arr,\
-                                                    iteration,metric_input,clusters_hist,time)
+                                                    iteration,metric_input,clusters_hist,time,noAdd)
 
-        taboo_plumedat=gen_plumed_input(parameters,include,clusters_hist)
+        taboo_plumedat=gen_plumed_input(parameters,include,clusters_hist,noAdd)
         print "Iteration "+str(iteration)+" is going to be submitted."
         qsub_md=submit_calc(parameters,iteration)  
         cv_arr,metric_arr,time=combine_trajectories(iteration,parameters)
-        clusters,outliers=clustering(time,metric_arr,iteration,parameters)
-        if parameters['debug']==True:
-           clusters=outliers
-        save_clusters(parameters,clusters,iteration)
+        clusters,outliers,noAdd=clustering(time,metric_arr,iteration,parameters)
+        save_clusters(parameters,clusters,iteration,noAdd)
         if parameters['target'] is not None:
            calc_avg(iteration,time,clusters,cv_arr,metric_arr,metricAvgTarget,metricSDTarget,cvAvgTarget,cvSDTarget)
         generate_restarts(clusters,outliers,iteration,parameters)
