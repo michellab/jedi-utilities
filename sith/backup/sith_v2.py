@@ -819,7 +819,7 @@ def build_metric_bias(parameters,include,clusters,outliers,metric_arr,iteration,
            line= line='rest_'+time_str+'_'+str(iteration)+': '+parameters['bias']+' ARG=dist_'+time_str+\
                  ' AT='+str(clusdist_avg)+' KAPPA='+str(parameters['kappa_metric'])+'\n'
         elif parameters['bias']=='MOVINGRESTRAINT_L':
-           first=int(parameters['nsteps'])*0.2
+           first=int(int(parameters['nsteps'])*0.2)
            line='MOVINGRESTRAINT ...\n'+\
                 'ARG=dist_'+time_str+'\n'+\
                 'VERSE=L\n'+\
