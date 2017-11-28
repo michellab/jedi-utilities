@@ -93,7 +93,7 @@ def getGridCoordinates(input_grid):
         elif numline==2:
            continue
         else:
-           coords.append([float(line[1]),float(line[2]),float(line[3])])
+           coords.append([float(line[1])/10,float(line[2])/10,float(line[3])/10])
     grid_file.close()
     return coords,num_points
 

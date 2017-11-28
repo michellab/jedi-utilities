@@ -32,5 +32,5 @@ gmx grompp -f npt.mdp -c nvt.gro -p system.top -o npt.tpr
 gmx mdrun -deffnm npt -plumed plumed.dat -v
 # *** Production NPT ***
 gmx grompp -f md.mdp -c npt.gro -p system.top -o md.tpr -maxwarn 1
-gmx mdrun -deffnm md -plumed plumed.dat -v
+gmx mdrun -deffnm md -plumed plumed.dat -v -nsteps -1
 

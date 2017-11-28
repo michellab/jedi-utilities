@@ -35,6 +35,9 @@ optional arguments:
   -k [yes/no], --crop [yes/no]
                         delete (or not) the grid points that are further 
                         from the ligand than the cutoff. Default is yes.
+  -f [yes/no], --full [yes/no]
+                        generate a grid that covers the whole protein.
+                        Default is no.
 
 jedi-setup.py is distributed under the GPL.
 
@@ -387,6 +390,7 @@ def outputPdb(frame, outfile="output.pdb", indices=None):
             if line.startswith("ATOM"):
                 new_idx = indices[pdb_idx] + 1 # Because starts at 0
                 mass = frame.topology.atom(pdb_idx).element.mass
+                radius = frame.topology.atom(pdb_idx).element.radius
                 #print pdb_idx, new_idx, mass
                 if new_idx < 10:
                     str_idx = '    %s' % new_idx
@@ -399,7 +403,8 @@ def outputPdb(frame, outfile="output.pdb", indices=None):
                 else:
                     str_idx = '%s' % new_idx
                 str_mass = '%-5.2f' % mass
-                new_line = line[0:6] + str_idx + line[11:55] + str_mass + line[60:] 
+                str_radius = '%-5.2f' % radius
+                new_line = line[0:6] + str_idx + line[11:55] + str_mass + '  ' + str_radius + line[66:] 
                 #import pdb; pdb.set_trace()
                 wstream.write(new_line)
                 pdb_idx +=1
