@@ -1,5 +1,5 @@
-Log file opened on Thu Jan 12 20:08:53 2017
-Host: ishikawa  pid: 30048  rank ID: 0  number of ranks:  1
+Log file opened on Tue Nov 28 14:28:06 2017
+Host: ishikawa  pid: 6024  rank ID: 0  number of ranks:  1
                     :-) GROMACS - gmx mdrun, VERSION 5.1 (-:
 
                             GROMACS is written by:
@@ -26,15 +26,15 @@ as published by the Free Software Foundation; either version 2.1
 of the License, or (at your option) any later version.
 
 GROMACS:      gmx mdrun, VERSION 5.1
-Executable:   /usr/local/gromacs/bin/gmx
-Data prefix:  /usr/local/gromacs
+Executable:   /home/joan/local/gromacs5.1_mpi-plumed2/bin/gmx_mpi
+Data prefix:  /home/joan/local/gromacs5.1_mpi-plumed2
 Command line:
-  gmx mdrun -nt 1 -deffnm sp -plumed plumed.dat -v -rerun system_processed.gro
+  gmx mdrun -deffnm sp -plumed plumed.dat -v -rerun system_processed.gro
 
 GROMACS version:    VERSION 5.1
 Precision:          single
 Memory model:       64 bit
-MPI library:        thread_mpi
+MPI library:        MPI
 OpenMP support:     enabled (GMX_OPENMP_MAX_THREADS = 32)
 GPU support:        disabled
 OpenCL support:     disabled
@@ -45,9 +45,9 @@ RDTSCP usage:       enabled
 C++11 compilation:  enabled
 TNG support:        enabled
 Tracing support:    disabled
-Built on:           Thu Mar  3 11:02:47 GMT 2016
-Built by:           joan@ishikawa [CMAKE]
-Build OS/arch:      Linux 3.19.0-49-generic x86_64
+Built on:           Mon Jan 16 17:41:58 GMT 2017
+Built by:           root@ishikawa [CMAKE]
+Build OS/arch:      Linux 4.4.0-53-generic x86_64
 Build CPU vendor:   GenuineIntel
 Build CPU brand:    Intel(R) Xeon(R) CPU E3-1270 v3 @ 3.50GHz
 Build CPU family:   6   Model: 60   Stepping: 3
@@ -60,7 +60,7 @@ Boost version:      1.55.0 (internal)
 
 
 Running on 1 node with total 4 cores, 8 logical cores
-Hardware detected:
+Hardware detected on host ishikawa (the node of MPI rank 0):
   CPU info:
     Vendor: GenuineIntel
     Brand:  Intel(R) Xeon(R) CPU E3-1270 v3 @ 3.50GHz
@@ -116,18 +116,19 @@ GROMACS: A message-passing parallel molecular dynamics implementation
 Comp. Phys. Comm. 91 (1995) pp. 43-56
 -------- -------- --- Thank You --- -------- --------
 
+Can not increase nstlist because an NVE ensemble is used
 Input Parameters:
    integrator                     = md
    tinit                          = 0
-   dt                             = 0.002
-   nsteps                         = 0
+   dt                             = 0.001
+   nsteps                         = 50000
    init-step                      = 0
    simulation-part                = 1
    comm-mode                      = Linear
    nstcomm                        = 100
    bd-fric                        = 0
-   ld-seed                        = 3381930150
-   emtol                          = 10
+   ld-seed                        = 3413010810
+   emtol                          = 1000
    emstep                         = 0.01
    niter                          = 20
    fcstep                         = 0
@@ -136,45 +137,45 @@ Input Parameters:
    rtpi                           = 0.05
    nstxout                        = 0
    nstvout                        = 0
-   nstfout                        = 1
-   nstlog                         = 1
-   nstcalcenergy                  = 1
-   nstenergy                      = 1
-   nstxout-compressed             = 1
+   nstfout                        = 0
+   nstlog                         = 1000
+   nstcalcenergy                  = 100
+   nstenergy                      = 1000
+   nstxout-compressed             = 0
    compressed-x-precision         = 1000
-   cutoff-scheme                  = Group
+   cutoff-scheme                  = Verlet
    nstlist                        = 10
    ns-type                        = Grid
-   pbc                            = no
+   pbc                            = xyz
    periodic-molecules             = FALSE
-   verlet-buffer-tolerance        = 0.005
-   rlist                          = 1
+   verlet-buffer-tolerance        = -1
+   rlist                          = 1.1
    rlistlong                      = 1
-   nstcalclr                      = 0
-   coulombtype                    = Cut-off
-   coulomb-modifier               = None
+   nstcalclr                      = 10
+   coulombtype                    = PME
+   coulomb-modifier               = Potential-shift
    rcoulomb-switch                = 0
    rcoulomb                       = 1
    epsilon-r                      = 1
    epsilon-rf                     = inf
    vdw-type                       = Cut-off
-   vdw-modifier                   = None
+   vdw-modifier                   = Potential-shift
    rvdw-switch                    = 0
    rvdw                           = 1
    DispCorr                       = No
    table-extension                = 1
    fourierspacing                 = 0.12
-   fourier-nx                     = 0
-   fourier-ny                     = 0
-   fourier-nz                     = 0
+   fourier-nx                     = 36
+   fourier-ny                     = 52
+   fourier-nz                     = 32
    pme-order                      = 4
    ewald-rtol                     = 1e-05
    ewald-rtol-lj                  = 0.001
    lj-pme-comb-rule               = Geometric
    ewald-geometry                 = 0
    epsilon-surface                = 0
-   implicit-solvent               = GBSA
-   gb-algorithm                   = OBC
+   implicit-solvent               = No
+   gb-algorithm                   = Still
    nstgbradii                     = 1
    rgbradii                       = 1
    gb-epsilon-solvent             = 80
@@ -184,7 +185,7 @@ Input Parameters:
    gb-obc-gamma                   = 4.85
    gb-dielectric-offset           = 0.009
    sa-algorithm                   = Ace-approximation
-   sa-surface-tension             = 2.25936
+   sa-surface-tension             = 2.05016
    tcoupl                         = No
    nsttcouple                     = -1
    nh-chain-length                = 0
@@ -273,7 +274,7 @@ qm-opts:
    userreal3                      = 0
    userreal4                      = 0
 grpopts:
-   nrdf:        4523
+   nrdf:        6831
    ref-t:           0
    tau-t:           0
 annealing:          No
@@ -282,42 +283,51 @@ annealing-npoints:           0
    nfreeze:           N           N           N
    energygrp-flags[  0]: 0
 
-Using 1 MPI thread
+Using 1 MPI process
+Using 8 OpenMP threads 
 
+Will do PME sum in reciprocal space for electrostatic interactions.
 
-NOTE: This file uses the deprecated 'group' cutoff_scheme. This will be
-removed in a future release when 'verlet' supports all interaction forms.
+++++ PLEASE READ AND CITE THE FOLLOWING REFERENCE ++++
+U. Essmann, L. Perera, M. L. Berkowitz, T. Darden, H. Lee and L. G. Pedersen 
+A smooth particle mesh Ewald method
+J. Chem. Phys. 103 (1995) pp. 8577-8592
+-------- -------- --- Thank You --- -------- --------
 
-Table routines are used for coulomb: FALSE
-Table routines are used for vdw:     FALSE
-Cut-off's:   NS: 1   Coulomb: 1   LJ: 1
+Will do ordinary reciprocal space Ewald sum.
+Using a Gaussian width (1/beta) of 0.320163 nm for Ewald
+Cut-off's:   NS: 1.1   Coulomb: 1   LJ: 1
 System total charge: 0.000
+Generated table with 1000 data points for Ewald.
+Tabscale = 500 points/nm
+Generated table with 1000 data points for LJ6.
+Tabscale = 500 points/nm
+Generated table with 1000 data points for LJ12.
+Tabscale = 500 points/nm
 Generated table with 1000 data points for 1-4 COUL.
 Tabscale = 500 points/nm
 Generated table with 1000 data points for 1-4 LJ6.
 Tabscale = 500 points/nm
 Generated table with 1000 data points for 1-4 LJ12.
 Tabscale = 500 points/nm
-Potential shift: LJ r^-12: 0.000e+00 r^-6: 0.000e+00, Coulomb -0e+00
+Potential shift: LJ r^-12: -1.000e+00 r^-6: -1.000e+00, Ewald -1.000e-05
+Initialized non-bonded Ewald correction tables, spacing: 9.33e-04 size: 1073
 
-Initializing LINear Constraint Solver
 
-++++ PLEASE READ AND CITE THE FOLLOWING REFERENCE ++++
-B. Hess and H. Bekker and H. J. C. Berendsen and J. G. E. M. Fraaije
-LINCS: A Linear Constraint Solver for molecular simulations
-J. Comp. Chem. 18 (1997) pp. 1463-1472
--------- -------- --- Thank You --- -------- --------
+Using AVX2_256 4x8 non-bonded kernels
 
-The number of constraints is 2308
+Using Lorentz-Berthelot Lennard-Jones combination rule
+
+Removing pbc first time
+Pinning threads with an auto-selected logical core stride of 1
 Center of mass motion removal mode is Linear
 We have the following groups for center of mass motion removal:
   0:  rest
 There are: 2278 Atoms
-RMS relative constraint deviation after constraining: 0.00e+00
-Initial temperature: 468.313 K
+Initial temperature: 0 K
 
 PLUMED: PLUMED is starting
-PLUMED: Version: 2.3.0-dev (git: v2.2b-156-g9fb5a0c-dirty) compiled on Aug  3 2016 at 12:11:50
+PLUMED: Version: 2.3.0-dev (git: v2.2b-157-ga9a0c71-dirty) compiled on Jul 20 2017 at 14:06:43
 PLUMED: Please cite this paper when using PLUMED [1]
 PLUMED: For further information see the PLUMED web page at http://www.plumed-code.org
 PLUMED: Molecular dynamics engine: gromacs
@@ -333,34 +343,29 @@ PLUMED:   with label je
 PLUMED:   using periodic boundary conditions
 PLUMED: Action PRINT
 PLUMED:   with label @1
-PLUMED:   with stride 100
+PLUMED:   with stride 1
 PLUMED:   with arguments je
 PLUMED:   on file COLVAR
 PLUMED:   with format  %f
 PLUMED: END FILE: plumed.dat
-PLUMED: Timestep: 0.002000
+PLUMED: Timestep: 0.001000
 PLUMED: KbT has not been set by the MD engine
 PLUMED: It should be set by hand where needed
 PLUMED: Relevant bibliography:
 PLUMED:   [1] Tribello, Bonomi, Branduardi, Camilloni, and Bussi, Comput. Phys. Commun. 185, 604 (2014)
 PLUMED: Please read and cite where appropriate!
 PLUMED: Finished setup
-Started mdrun on rank 0 Thu Jan 12 20:08:53 2017
+Started mdrun on rank 0 Tue Nov 28 14:28:06 2017
            Step           Time         Lambda
               0        0.00000        0.00000
 
-Note: The available nonbonded kernels do not support water optimization - disabling.
-
-Grid: 6 x 9 x 6 cells
    Energies (kJ/mol)
-          Angle    Proper Dih.  Improper Dih.GB Polarization  Nonpolar Sol.
-    2.50182e+03    6.03534e+03    1.65931e+02   -1.53482e+04    3.13572e+02
-          LJ-14     Coulomb-14        LJ (SR)   Coulomb (SR) Position Rest.
-    3.22877e+03    1.45747e+04    3.22897e+03   -2.87288e+04    0.00000e+00
-      Potential    Kinetic En.   Total Energy    Temperature Pressure (bar)
-   -1.40280e+04    4.40288e+03   -9.62510e+03    2.34156e+02    0.00000e+00
-   Constr. rmsd
-    0.00000e+00
+           Bond          Angle    Proper Dih.  Improper Dih.          LJ-14
+    1.19421e+05    2.50183e+03    6.03536e+03    1.65931e+02    3.22877e+03
+     Coulomb-14        LJ (SR)   Coulomb (SR)   Coul. recip.      Potential
+    1.45747e+04    3.45619e+03   -4.01072e+04    4.84791e+03    1.14124e+05
+    Kinetic En.   Total Energy    Temperature Pressure (bar)
+    0.00000e+00    1.14124e+05    0.00000e+00    6.71781e+03
 
 
 	M E G A - F L O P S   A C C O U N T I N G
@@ -372,49 +377,59 @@ Grid: 6 x 9 x 6 cells
 
  Computing:                               M-Number         M-Flops  % Flops
 -----------------------------------------------------------------------------
- NB Elec. [V&F]                           0.841704           0.842     0.0
- NB VdW & Elec. [V&F]                    19.663452          19.663     0.2
- 1,4 nonbonded interactions               0.006049           0.544     0.0
- Born radii (HCT/OBC)                    55.669759       10187.566    99.0
- Born force chain rule                    4.572207          68.583     0.7
- NS-Pairs                                 0.630947          13.250     0.1
- CG-CoM                                   0.002278           0.007     0.0
- Angles                                   0.004178           0.702     0.0
- Propers                                  0.006490           1.486     0.0
- Impropers                                0.000468           0.097     0.0
- Pos. Restr.                              0.001142           0.057     0.0
+ Pair Search distance check               0.386784           3.481     3.3
+ NxN Ewald Elec. + LJ [V&F]               0.751856          80.449    76.9
+ NxN Ewald Elec. [V&F]                    0.008944           0.751     0.7
+ 1,4 nonbonded interactions               0.006049           0.544     0.5
+ Calc Weights                             0.006834           0.246     0.2
+ Spread Q Bspline                         0.145792           0.292     0.3
+ Gather F Bspline                         0.145792           0.875     0.8
+ 3D-FFT                                   1.901396          15.211    14.5
+ Solve PME                                0.001872           0.120     0.1
+ Shift-X                                  0.002278           0.014     0.0
+ Bonds                                    0.002308           0.136     0.1
+ Angles                                   0.004178           0.702     0.7
+ Propers                                  0.006490           1.486     1.4
+ Impropers                                0.000468           0.097     0.1
  Virial                                   0.002323           0.042     0.0
  Stop-CM                                  0.004556           0.046     0.0
- Calc-Ekin                                0.004556           0.123     0.0
+ Calc-Ekin                                0.004556           0.123     0.1
 -----------------------------------------------------------------------------
- Total                                                   10293.008   100.0
+ Total                                                     104.614   100.0
 -----------------------------------------------------------------------------
 
 
      R E A L   C Y C L E   A N D   T I M E   A C C O U N T I N G
 
-On 1 MPI rank
+On 1 MPI rank, each using 8 OpenMP threads
 
  Computing:          Num   Num      Call    Wall time         Giga-Cycles
                      Ranks Threads  Count      (s)         total sum    %
 -----------------------------------------------------------------------------
- Neighbor search        1    1          1       0.008          0.026   6.0
- Force                  1    1          1       0.112          0.392  88.9
- Write traj.            1    1          1       0.000          0.001   0.1
- Rest                                           0.006          0.022   5.0
+ Neighbor search        1    8          1       0.001          0.019   2.3
+ Force                  1    8          1       0.026          0.720  85.7
+ PME mesh               1    8          1       0.001          0.014   1.7
+ NB X/F buffer ops.     1    8          1       0.000          0.000   0.0
+ Rest                                           0.003          0.087  10.4
 -----------------------------------------------------------------------------
- Total                                          0.126          0.441 100.0
+ Total                                          0.030          0.840 100.0
+-----------------------------------------------------------------------------
+ Breakdown of PME mesh computation
+-----------------------------------------------------------------------------
+ PME spread/gather      1    8          2       0.000          0.005   0.6
+ PME 3D-FFT             1    8          2       0.000          0.007   0.8
+ PME solve Elec         1    8          1       0.000          0.002   0.3
 -----------------------------------------------------------------------------
 
                Core t (s)   Wall t (s)        (%)
-       Time:        0.126        0.126      100.0
+       Time:        0.239        0.030      793.9
                  (ns/day)    (hour/ns)
-Performance:        1.368       17.543
-Finished mdrun on rank 0 Thu Jan 12 20:08:53 2017
+Performance:        2.874        8.351
+Finished mdrun on rank 0 Tue Nov 28 14:28:06 2017
 PLUMED:                                               Cycles        Total      Average      Minumum      Maximum
-PLUMED:                                                    1     0.100206     0.100206     0.100206     0.100206
-PLUMED: 1 Prepare dependencies                             1     0.000008     0.000008     0.000008     0.000008
-PLUMED: 2 Sharing data                                     1     0.000157     0.000157     0.000157     0.000157
-PLUMED: 3 Waiting for data                                 1     0.000012     0.000012     0.000012     0.000012
-PLUMED: 4 Calculating (forward loop)                       1     0.080082     0.080082     0.080082     0.080082
-PLUMED: 5 Applying (backward loop)                         1     0.000135     0.000135     0.000135     0.000135
+PLUMED:                                                    1     0.038631     0.038631     0.038631     0.038631
+PLUMED: 1 Prepare dependencies                             1     0.000004     0.000004     0.000004     0.000004
+PLUMED: 2 Sharing data                                     1     0.000031     0.000031     0.000031     0.000031
+PLUMED: 3 Waiting for data                                 1     0.000005     0.000005     0.000005     0.000005
+PLUMED: 4 Calculating (forward loop)                       1     0.024674     0.024674     0.024674     0.024674
+PLUMED: 5 Applying (backward loop)                         1     0.000045     0.000045     0.000045     0.000045

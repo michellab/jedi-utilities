@@ -2,7 +2,7 @@
 ;	File 'system.top' was generated
 ;	By user: joan (1000)
 ;	On host: ishikawa
-;	At date: Thu Jan 12 20:08:52 2017
+;	At date: Tue Nov 28 14:28:05 2017
 
 ;
 ;	This is a standalone topology file
@@ -10,8 +10,8 @@
 ;	Created by:
 ;	                  :-) GROMACS - gmx pdb2gmx, VERSION 5.1 (-:
 ;	
-;	Executable:   /usr/local/gromacs/bin/gmx
-;	Data prefix:  /usr/local/gromacs
+;	Executable:   /home/joan/local/gromacs5.1_mpi-plumed2/bin/gmx_mpi
+;	Data prefix:  /home/joan/local/gromacs5.1_mpi-plumed2
 ;	Command line:
 ;	  gmx pdb2gmx -f system_allh.pdb -o system_processed.gro -p system.top -ff amber99sb-ildn -water tip3p -ignh
 ;	Force field was read from the standard GROMACS share directory.
