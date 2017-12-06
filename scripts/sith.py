@@ -579,7 +579,6 @@ def setupMetric(parameters):
        fileout.close()
        print "The sines and cosines of "+str(len(chi.keys()))+ " torsions are going to be used as a metric."
        print "This is a total of "+str(2*len(chi.keys()))+" variables"
-       sys.exit()
        return chi
 
           
