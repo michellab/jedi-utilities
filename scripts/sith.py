@@ -467,8 +467,30 @@ def setupMetric(parameters):
        else:
           structure=parameters['reference_structure']
  
+       torsion_specs=['SC_list','TOR_list']
+       for spec in torsion_specs:
+           atLeastOne=False
+           if spec not in parameters.keys():
+              parameters[spec]=None
+           else:
+              atLeastOne=True
+       if atLeastOne==False:
+          print "You need to specify how the torsions will be chosen (whole SC (SC_list) or just some TOR (TOR_list)). eXITING."
+          sys.exit()
        if parameters['SC_list'] is not None:
           residues_str=parameters['SC_list'].split(',')
+       elif parameters['TOR_list'] is not None:
+          torsions={}
+          residues_str=[]
+          for residue in parameters['TOR_list'].split(','):
+              res=residue.split(':')[0]
+              residues_str.append(res)
+              torsions[res]=[]
+              for torsion in residue.split(':')[1].split(';'):
+                  torsions[res].append(torsion)
+          print residues_str
+          print torsions
+          #sys.exit()
        elif cv=='JEDI':
           apolar=parameters['apolar']
           polar=parameters['polar']
@@ -495,21 +517,23 @@ def setupMetric(parameters):
            for atom in mdtraj.compute_chi1(struct)[0][i]:
                for at2 in struct.topology.atoms:
                    if int(at2.index)==atom and str(at2.residue) in residues_str:
-                      atoms.append(str(atom+1)) # +1 because they start at 0 in mdtraj but at 1 in GROMACS
-                      name='chi1_'+str(at2.residue)
+                      if parameters['TOR_list']==None or (str(at2.residue) in torsions.keys() and 'chi1' in torsions[str(at2.residue)]):
+                         atoms.append(str(atom+1)) # +1 because they start at 0 in mdtraj but at 1 in GROMACS
+                         name='chi1_'+str(at2.residue)
            if len(atoms)==4:
               chi[name]=atoms
            elif len(atoms)!=0:
               print "something went wrong when assigning dihedrals. A dihedral can't have a number of atoms different than 4"
               break
-
+       
        for i in range(0,len(mdtraj.compute_chi2(struct)[0])):
            atoms=[]
            for atom in mdtraj.compute_chi2(struct)[0][i]:
                for at2 in struct.topology.atoms:
                    if int(at2.index)==atom and str(at2.residue) in residues_str:
-                     atoms.append(str(atom+1)) # +1 because they start at 0 in mdtraj but at 1 in GROMACS
-                     name='chi2_'+str(at2.residue)
+                      if parameters['TOR_list']==None or (str(at2.residue) in torsions.keys() and 'chi2' in torsions[str(at2.residue)]):
+                        atoms.append(str(atom+1)) # +1 because they start at 0 in mdtraj but at 1 in GROMACS
+                        name='chi2_'+str(at2.residue)
            if len(atoms)==4:
               chi[name]=atoms
            elif len(atoms)!=0:
@@ -521,8 +545,9 @@ def setupMetric(parameters):
            for atom in mdtraj.compute_chi3(struct)[0][i]:
                for at2 in struct.topology.atoms:
                    if int(at2.index)==atom and str(at2.residue) in residues_str:
-                      atoms.append(str(atom+1)) # +1 because they start at 0 in mdtraj but at 1 in GROMACS
-                      name='chi3_'+str(at2.residue)
+                      if parameters['TOR_list']==None or (str(at2.residue) in torsions.keys() and 'chi3' in torsions[str(at2.residue)]):
+                         atoms.append(str(atom+1)) # +1 because they start at 0 in mdtraj but at 1 in GROMACS
+                         name='chi3_'+str(at2.residue)
            if len(atoms)==4:
               chi[name]=atoms
            elif len(atoms)!=0:
@@ -534,8 +559,9 @@ def setupMetric(parameters):
            for atom in mdtraj.compute_chi4(struct)[0][i]:
                for at2 in struct.topology.atoms:
                    if int(at2.index)==atom and str(at2.residue) in residues_str:
-                      atoms.append(str(atom+1)) # +1 because they start at 0 in mdtraj but at 1 in GROMACS
-                      name='chi4_'+str(at2.residue)
+                      if parameters['TOR_list']==None or (str(at2.residue) in torsions.keys() and 'chi4' in torsions[str(at2.residue)]):
+                         atoms.append(str(atom+1)) # +1 because they start at 0 in mdtraj but at 1 in GROMACS
+                         name='chi4_'+str(at2.residue)
            if len(atoms)==4:
               chi[name]=atoms
            elif len(atoms)!=0:
@@ -553,6 +579,7 @@ def setupMetric(parameters):
        fileout.close()
        print "The sines and cosines of "+str(len(chi.keys()))+ " torsions are going to be used as a metric."
        print "This is a total of "+str(2*len(chi.keys()))+" variables"
+       sys.exit()
        return chi
 
           
@@ -1012,7 +1039,7 @@ def clustering(time,values,iteration,parameters):
                       rhoi=rhoi+1
             rho.append(rhoi)
         print rho
-        sys.exit()
+        #sys.exit()
 
         #calculate delta for each data point:
         delta=[]
