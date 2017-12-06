@@ -34,6 +34,14 @@ parser.add_argument('-i','--input', nargs="?",
 parser.add_argument('-d','--debug',action='store_true',
                     help='Do not remove any files (rename them if necessary)')
 
+# Funtions that make your life easier
+
+def isfloat(value):
+  try:
+    float(value)
+    return True
+  except ValueError:
+    return False
 
 # Get all the parameters from the input file
 def parse(parser):
@@ -217,6 +225,10 @@ ERROR ! The input cannot be found. See usage above.
        if 'cluster_dc' not in parameters.keys():
           print "The value for dc or a way to calculate it has not been specified. Will use d0=euclidMat_avg-2*euclidMat_sd"
           parameters['cluster_dc']='avg-2sd'
+       elif isfloat(parameters['cluster_dc'])==True:
+          print "The value ", parameters['cluster_dc'], " is going to be used as dc for the clustering"
+          parameters['dc_value']=float(parameters['cluster_dc'])
+          parameters['cluster_dc']='value'
        elif parameters['cluster_dc'] not in d0_methods:
           print "The method to calculate dc is not supported."
           print "Currently supported methods are: "+','.join(d0_methods)+". exiting"
@@ -824,9 +836,11 @@ def build_metric_bias(parameters,include,clusters,outliers,metric_arr,iteration,
                 'ARG=dist_'+time_str+'\n'+\
                 'VERSE=L\n'+\
                 'STEP0=0 AT0=0 KAPPA0='+str(parameters['kappa_metric'])+'\n'+\
-                'STEP1='+str(first)+' AT1='+str(clusdist_avg)+' KAPPA1='+str(parameters['kappa_metric'])+'\n'+\
-                'STEP2='+str(parameters['nsteps'])+' AT2='+str(clusdist_avg)+' KAPPA2='+str(parameters['kappa_metric'])+'\n'+\
+                'STEPR1='+str(parameters['nsteps'])+' AT1='+str(clusdist_avg)+' KAPPA1='+str(parameters['kappa_metric'])+'\n'+\
                 '... MOVINGRESTRAINT\n'
+                #'STEP1='+str(first)+' AT1='+str(clusdist_avg)+' KAPPA1='+str(parameters['kappa_metric'])+'\n'+\
+                #'STEP2='+str(parameters['nsteps'])+' AT2='+str(clusdist_avg)+' KAPPA2='+str(parameters['kappa_metric'])+'\n'+\
+                # I think slowly sampling everything along the reaction coordinate makes more sense than just a short sMD and then a restrained MD at a certain value.
         fileout.write(line)
     fileout.close()
     include.append(nameOut)
@@ -965,6 +979,7 @@ def clustering(time,values,iteration,parameters):
             euclidMat.append(euclid)
         euclidMat=numpy.array(euclidMat)
         #print euclidMat
+        #sys.exit()
         euclidMat_avg=numpy.mean(euclidMat_stats)
         euclidMat_sd=numpy.std(euclidMat_stats)
 
@@ -972,12 +987,15 @@ def clustering(time,values,iteration,parameters):
         #print "euclidMat_sd = ", euclidMat_sd
 
         #calculte rho for each data point
+        if parameters['cluster_dc']=='value':
+           d0=parameters['dc_value']
         if parameters['cluster_dc']=='avg-2sd':
            d0=euclidMat_avg-2*euclidMat_sd 
         elif parameters['cluster_dc']=='avg-sd':
            d0=euclidMat_avg-euclidMat_sd
         elif parameters['cluster_dc']=='avg':
            d0=euclidMat_avg
+        
         
         rho=[]
         for i in range(0,len(values)):
@@ -993,7 +1011,8 @@ def clustering(time,values,iteration,parameters):
                    if euclidMat[j][i]<d0:
                       rhoi=rhoi+1
             rho.append(rhoi)
-        #print rho
+        print rho
+        sys.exit()
 
         #calculate delta for each data point:
         delta=[]
