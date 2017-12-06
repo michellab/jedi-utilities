@@ -38,6 +38,9 @@ optional arguments:
   -f [yes/no], --full [yes/no]
                         generate a grid that covers the whole protein.
                         Default is no.
+  -fp [POCKET] --fpocket [POCKET]
+                        Generate the grid and the binding site from a
+                        PDB file containing fpocket alpha spheres.
 
 jedi-setup.py is distributed under the GPL.
 
@@ -89,6 +92,8 @@ parser.add_argument('-k', '--crop',nargs="?",
 parser.add_argument('-f', '--full',nargs="?",
                     default="no",
                     help="Generate a grid that overlaps the whole protein")
+parser.add_argument('-fp', '--fpocket',nargs="?",
+                    help="Generate the grid and the binding site from a PDB file containing fpocket alpha spheres.")
 
 def parse(parser):
     args = parser.parse_args()
@@ -108,11 +113,16 @@ ERROR ! The input PDB cannot be found. See usage above.
         sys.exit(-1)
 
     # Catch lack of ligand and region file if the -f/--full flag is not present
-    if ( (args.ligand is None and args.region is None) or
-         (not args.ligand is None and not args.region is None) ) and (args.full=="no"):
+    if ( (args.ligand is None and args.region is None and args.fpocket is None) or 
+         (
+          (args.ligand is not None and args.region is not None) or 
+          (args.fpocket is not None and args.region is not None) or 
+          (args.ligand is not None and args.fpocket is not None) 
+         ) 
+       ) and (args.full=="no"):
         parser.print_help()
         print ("""@@@
-ERROR ! You must specify a ligand OR a region file as input.
+ERROR ! You must specify a ligand, a region file or fpocket alpha spheres as input.
 @@@""")
         sys.exit(-1)
 
@@ -132,6 +142,13 @@ ERROR ! The specified input region file cannot be found. See usage above.
 @@@""")
         sys.exit(-1)
 
+    if args.fpocket is not None:
+       if not os.path.isfile(args.fpocket):
+          print "File "+args.fpocket+" could not be found. Exiting"
+          sys.exit()
+       print "Grid and binding site are going to be generated from fpocket alpha spheres from file "+args.fpocket
+
+
     # Inform the user of whether water oxygens are omitted or not
     if (args.ignore_waters is None) or (args.ignore_waters == "yes"):
        print "Water oxygens are going to be ignored"
@@ -144,37 +161,45 @@ ERROR ! The -w flag can only have "yes" or "no". Default is "yes".
        sys.exit(-1)
 
     # Inform the user of whether the grid is going to be cropped or not
-    if ((args.crop is None) or (args.crop == "yes")) and (args.full=="no"):
+    if not (args.crop is None or args.crop == "yes" or args.crop=="no"):
+       print """@@@
+ERROR ! The -k flag can only have "yes" or "no". Default is "yes".
+@@@"""
+       sys.exit(-1)
+       
+    elif ((args.crop is None) or (args.crop == "yes")) and (args.full=="no") and args.ligand is not None:
        print "The grid points further than ", args.cutoff, " nm from the ligand are going to be deleted."
     elif (args.crop == "no") and (args.full=="no"):
        print "All grid points are going to be kept."
     elif args.full=="yes":
        print "Overlapping a grid onto the whole protein"
-    else:
-       print """@@@
-ERROR ! The -k flag can only have "yes" or "no". Default is "yes".
-@@@"""
-       sys.exit(-1)
 
     if args.full=="yes":
        print "The grid is going to overlap the whole protein"
-
-
+   
     print (args)
     return args.input, args.ligand, float(args.cutoff), args.region, float(args.spacing),\
-        args.apolar,args.polar,args.grid,args.ignore_waters,args.crop,args.full
+        args.apolar,args.polar,args.grid,args.ignore_waters,args.crop,args.full,args.fpocket
 
 
-def loadStructure(pdbfile):
-    """Input: pdbfile: A pdb file name
-    Output: A datastructure that holds a pdb frame
+def loadStructure(pdbfile,origin=None):
+    """Input: pdbfile: A pdb file name and the origin from which the grid will be defined (optional)
+    Output: A datastructure that holds a pdb frame and (optional) a list with necessary parameters as bfactor
     """
     struc = mdtraj.load(pdbfile)
     # Remove the water molecules unless the specifies otherwise
     if wat == 'yes': 
        struc=struc.remove_solvent()
-
-    return struc
+    if origin=='fpocket':
+       filein=open(pdbfile,'r')
+       bfact=[]
+       for line in filein:
+           if line.startswith('ATOM') or line.startswith('HETATM'):
+              bfact.append(float(line.split()[9])/10)
+       filein.close()
+    else:
+       bfact=None
+    return struc,bfact
 
 def loadRegion(regionfile):
     """
@@ -203,16 +228,17 @@ def loadRegion(regionfile):
 #    alignment = frame.atom_slice(subset)
 #    return alignment, subset
 
-def defineGrid(frame, full, ligand=None, lig_cutoff=5.0, region=None, spacing=0.15):
+def defineGrid(frame, full, ligand=None, lig_cutoff=5.0, region=None, spacing=0.15, fpocket=None, bfact=None):
     """Input: frame: a mdtraj frame
               ligand (optional): a mdtraj frame with ligand coordinates
               lig_cutoff (optional): the maximal distance between ligand
               atoms and grid points. In angstroms.
               region (optional): a txt file with min/max coordinates of a
               paralleliped.
+              fpocket (optional): an mdtraj frame containing the coordinates of the alpha spheres
        Output:
               grid: a mdtraj frame
-       Throw exception if ligand and region are both None
+       Throw exception if ligand and region and fpocket are all None
     """
     # Build bounding box around ligand. If ligand is none, use region file
     #
@@ -220,9 +246,23 @@ def defineGrid(frame, full, ligand=None, lig_cutoff=5.0, region=None, spacing=0.
     #
     mincoords = [99999.0, 99999.0, 99999.0]
     maxcoords = [-99999.0, -99999.0, -99999.0]
+    #min_crd=99999.0
+    #max_crd=-99999.0
+#    print "ligand ", ligand
+#    print "region " ,region
+#    print "fpocket ", fpocket
+#    sys.exit()
     if full=="no":
-        if ligand is not None:
+        if (ligand is not None):
             for i in range(0,ligand.n_atoms):
+               # min_crd_at=min(ligand.xyz[0][i])
+               # if min_crd_at<min_crd:
+               #    min_crd=min_crd_at
+               # max_crd_at=max(ligand.xyz[0][i])
+               # if max_crd_at>max_crd:
+               #    max_crd=max_crd_at
+            #mincoords=[min_crd]*3
+            #maxcoords=[max_crd]*3
                 atcoord = ligand.xyz[0][i]
                 #print (atcoord)
                 if atcoord[0] < mincoords[0]:
@@ -241,9 +281,30 @@ def defineGrid(frame, full, ligand=None, lig_cutoff=5.0, region=None, spacing=0.
             for i in range(0,3):
                 mincoords[i] = mincoords[i] - lig_cutoff
                 maxcoords[i] = maxcoords[i] + lig_cutoff
-        else:
+        elif region is not None:
             mincoords = region['min']
             maxcoords = region['max']
+        elif (fpocket is not None):
+            for i in range(0,fpocket.n_atoms):
+                atcoord = fpocket.xyz[0][i]
+                #print (atcoord)
+                if atcoord[0] < mincoords[0]:
+                    mincoords[0] = atcoord[0]
+                if atcoord[1] < mincoords[1]:
+                    mincoords[1] = atcoord[1]
+                if atcoord[2] < mincoords[2]:
+                    mincoords[2] = atcoord[2]
+                if atcoord[0] > maxcoords[0]:
+                    maxcoords[0] = atcoord[0]
+                if atcoord[1] > maxcoords[1]:
+                    maxcoords[1] = atcoord[1]
+                if atcoord[2] > maxcoords[2]:
+                    maxcoords[2] = atcoord[2]
+            # Now extend bounding box by lig_cutoff
+            for i in range(0,3):
+                mincoords[i] = mincoords[i] - max(bfact) 
+                maxcoords[i] = maxcoords[i] + min(bfact)
+
     elif full=="yes":
         for i in range(0,frame.n_atoms):
             atcoord=frame.xyz[0][i]
@@ -297,6 +358,22 @@ def defineGrid(frame, full, ligand=None, lig_cutoff=5.0, region=None, spacing=0.
                   cropcoords.append(gridpoint)
                   break
        coords=cropcoords    
+       Ngrid=len(coords)
+       print ("Total number of grid points (after cropping): %s " % Ngrid)
+    
+    elif fpocket is not None and crop=='yes':
+       cropcoords=[]
+       for gridpoint in coords:
+           for sphere in fpocket.xyz[0]:
+               i=int(numpy.where(fpocket.xyz[0]==sphere)[0][0])
+               radius=bfact[i]
+               distance=math.sqrt((sphere[0]-gridpoint[0])**2+\
+                                  (sphere[1]-gridpoint[1])**2+\
+                                  (sphere[2]-gridpoint[2])**2)
+               if distance<=radius:
+                  cropcoords.append(gridpoint)
+                  break
+       coords=cropcoords
        Ngrid=len(coords)
        print ("Total number of grid points (after cropping): %s " % Ngrid)
 
@@ -472,14 +549,14 @@ if __name__ == '__main__':
     print ("*** jedi setup beginning *** ")
     # Parse command line arguments
     system_pdb, ligand_pdb, lig_cutoff, region_dim, spacing,\
-        apolar_pdb, polar_pdb, grid_pdb, wat, crop, full = parse(parser)
+        apolar_pdb, polar_pdb, grid_pdb, wat, crop, full, fpocket_pdb = parse(parser)
     # Load protein coordinates
-    system = loadStructure(system_pdb)
+    system,bfact = loadStructure(system_pdb)
 
     # Load ligand coordinates/region definition if necessary
     if full=="no":
         if ligand_pdb is not None:
-            ligand = loadStructure(ligand_pdb)
+            ligand,bfact = loadStructure(ligand_pdb)
         else:
             ligand = None
 
@@ -487,9 +564,15 @@ if __name__ == '__main__':
             region = loadRegion(region_dim)
         else:
             region = None
+        
+        if fpocket_pdb is not None:
+            fpocket,bfact=loadStructure(fpocket_pdb,"fpocket")
+        else:
+            fpocket=None
     elif full=="yes":
         ligand=None
         region=None
+        fpocket=None
     else:
         print "Something went wrong. Check the code."
         sys.exit()
@@ -504,7 +587,7 @@ if __name__ == '__main__':
     print "spacing ", spacing
     #sys.exit("This is just a test, modifications done between line 367 and this point")
     grid_data = defineGrid(system,full,ligand=ligand, lig_cutoff=lig_cutoff,\
-                                   region=region, spacing=spacing)
+                                   region=region, spacing=spacing,fpocket=fpocket,bfact=bfact)
     polar, polar_indices, apolar, apolar_indices =\
         selectPolarApolar(system, grid_data[1], grid_data[2],ligand)
     # Now center grid on COM of polar+apolar region
