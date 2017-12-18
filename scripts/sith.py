@@ -862,7 +862,7 @@ def build_metric_bias(parameters,include,clusters,outliers,metric_arr,iteration,
                 'ARG=dist_'+time_str+'\n'+\
                 'VERSE=L\n'+\
                 'STEP0=0 AT0=0 KAPPA0='+str(parameters['kappa_metric'])+'\n'+\
-                'STEPR1='+str(parameters['nsteps'])+' AT1='+str(clusdist_avg)+' KAPPA1='+str(parameters['kappa_metric'])+'\n'+\
+                'STEP1='+str(parameters['nsteps'])+' AT1='+str(clusdist_avg)+' KAPPA1='+str(parameters['kappa_metric'])+'\n'+\
                 '... MOVINGRESTRAINT\n'
                 #'STEP1='+str(first)+' AT1='+str(clusdist_avg)+' KAPPA1='+str(parameters['kappa_metric'])+'\n'+\
                 #'STEP2='+str(parameters['nsteps'])+' AT2='+str(clusdist_avg)+' KAPPA2='+str(parameters['kappa_metric'])+'\n'+\
@@ -1009,8 +1009,8 @@ def clustering(time,values,iteration,parameters):
         euclidMat_avg=numpy.mean(euclidMat_stats)
         euclidMat_sd=numpy.std(euclidMat_stats)
 
-        #print "euclidMat_avg = ", euclidMat_avg
-        #print "euclidMat_sd = ", euclidMat_sd
+        print "euclidMat_avg = ", euclidMat_avg
+        print "euclidMat_sd = ", euclidMat_sd
 
         #calculte rho for each data point
         if parameters['cluster_dc']=='value':
@@ -1022,7 +1022,7 @@ def clustering(time,values,iteration,parameters):
         elif parameters['cluster_dc']=='avg':
            d0=euclidMat_avg
         
-        
+        print "Calculating rho"
         rho=[]
         for i in range(0,len(values)):
             rhoi=0.
@@ -1037,9 +1037,10 @@ def clustering(time,values,iteration,parameters):
                    if euclidMat[j][i]<d0:
                       rhoi=rhoi+1
             rho.append(rhoi)
-        print rho
+        #print rho
         #sys.exit()
-
+        
+        print "calculating delta"
         #calculate delta for each data point:
         delta=[]
         for i in range(0,len(values)):
@@ -1078,7 +1079,8 @@ def clustering(time,values,iteration,parameters):
 
         maxdelta=max(rhodelta[:,2])
         #print "Maximum density is:", maxdelta
-
+        
+        print "getting cluster centers"
         clusterCenters=[]
         for i in range(0,len(values)):
             if delta[i] >= maxdelta*0.95:
@@ -1095,6 +1097,7 @@ def clustering(time,values,iteration,parameters):
        
         #print "Found",len(clusterCenters), "cluster centers"
 
+        print "Assigning snapshots to each cluster center"
         clusters={}
         for center in clusterCenters:
             #print "Found center", center, "at time=", time[center], "picoseconds."
@@ -1116,6 +1119,7 @@ def clustering(time,values,iteration,parameters):
             clusters[time[center]].append(time[i])
 
     #check how many elements are in each cluster
+    print "Deciding if a cluster has been well sampled or it's an outlier"
     totalElements=0
     clusters_forward={}
     outliers_forward={}
@@ -1186,7 +1190,7 @@ def clustering(time,values,iteration,parameters):
     return clusters_forward,outliers_forward,noAdd
 
 
-def save_clusters(parameters,clusters,iteration,noAdd):
+def save_clusters(parameters,clusters,clustype,iteration,noAdd):
     if parameters['md_engine']=='GROMACS':
        trr='totaltraj.trr'
        tpr=parameters['tpr']
@@ -1196,7 +1200,7 @@ def save_clusters(parameters,clusters,iteration,noAdd):
            if time in noAdd:
               continue
            time=str(int(float(time)))
-           nameOut='center_'+time+'.pdb'
+           nameOut='center_'+clustype+'_'+time+'.pdb'
            if not os.path.isfile(nameOut): # the time of each center should be the same since we are combining iterations
               cmd=gmx+' trjconv -f '+trr+' -s '+tpr+' -n '+ndx+' -b '+str(int(time))+' -e '+str(int(time))+\
                   ' -pbc mol -ur compact -center -o '+nameOut+'<<OUT\n3\n0\n'
@@ -1351,7 +1355,8 @@ if __name__ == '__main__':
         qsub_md=submit_calc(parameters,iteration)  
         cv_arr,metric_arr,time=combine_trajectories(iteration,parameters)
         clusters,outliers,noAdd=clustering(time,metric_arr,iteration,parameters)
-        save_clusters(parameters,clusters,iteration,noAdd)
+        save_clusters(parameters,clusters,'cluster',iteration,noAdd)
+        save_clusters(parameters,outliers,'outlier',iteration,noAdd)
         if parameters['target'] is not None:
            calc_avg(iteration,time,clusters,cv_arr,metric_arr,metricAvgTarget,metricSDTarget,cvAvgTarget,cvSDTarget)
         generate_restarts(clusters,outliers,iteration,parameters)
