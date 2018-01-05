@@ -22,8 +22,10 @@ sith.py is distributed unfer a GPL license.
 import argparse
 import mdtraj
 import numpy, scipy, math
+from scipy import spatial
 import glob, os, sys
 import time as tiempo
+import psutil
 
 parser = argparse.ArgumentParser(description="Perform an iterative taboo search using the JEDI collective variable",
                                  epilog="sith.py is distributed under a GPL license.",
@@ -190,8 +192,8 @@ ERROR ! The input cannot be found. See usage above.
     if 'st_iter' not in parameters.keys():
         parameters['st_iter']=0
     elif int(parameters['st_iter'])!=0:
-        print "Restarting function has still to be debugged. Do NOT use. Exiting"
-        sys.exit()
+        print "WARNING. Using restarting function still to be debugged!!!!!"
+        #sys.exit()
     if 'clusters_hist' not in parameters.keys(): #history of sampled clusters
         parameters['clusters_hist']={}
     else:
@@ -640,9 +642,9 @@ def analyse_plumed_output(parameters, nameIn,iteration):
      
     #FIXME: this is assuming that the main CV is only one AND it is the first one after 'time'. Should not be very difficult to modify.
     filein=open(nameIn,'r')
-    cv_list_val=[]
-    metric_list_val=[]
-    time=[]
+    cv_list_val=None
+    metric_list_val=None
+    time=numpy.array([])
     dt=float(parameters['dt'])
     stride=int(parameters['stride'])
     strideps=dt*stride
@@ -667,21 +669,25 @@ def analyse_plumed_output(parameters, nameIn,iteration):
            elif iteration>0 and float(line[0])==0:
               continue
            time_ps=linum*strideps
-           time.append(time_ps)
+           time=numpy.append(time,time_ps)
            cv_lst_line=[]
            cv_lst_line.append(float(line[1]))
-           cv_list_val.append(cv_lst_line)
-           val_lst_line=[]
+           if cv_list_val is None:
+              cv_list_val=numpy.array(cv_lst_line)
+           else:
+              cv_list_val=numpy.append(cv_list_val,cv_lst_line)
+           val_lst_line=numpy.array([])
            for val in line[2:]:
-               val_lst_line.append(float(val))
-           metric_list_val.append(val_lst_line)
+               val_lst_line=numpy.append(val_lst_line,float(val))
+           if metric_list_val is None:
+              metric_list_val=numpy.array([val_lst_line])
+           else:
+              metric_list_val=numpy.append(metric_list_val,[val_lst_line],axis=0)
         linum=linum+1
 
-    time=numpy.asarray(time)
-    cv_list_val=numpy.asarray(cv_list_val)
-    metric_list_val=numpy.asarray(metric_list_val)
-  
-    #print metric_list_val
+    #time=numpy.asarray(time)
+    #cv_list_val=numpy.asarray(cv_list_val)
+    #metric_list_val=numpy.asarray(metric_list_val)
     #print  type(metric_list_val)
 
     cv_avg=numpy.average(cv_list_val,axis=0)
@@ -764,7 +770,7 @@ def gen_plumed_input(parameters,include,clusters_hist,noAdd):
 
 def build_metric_bias(parameters,include,clusters,outliers,metric_arr,iteration,metric_input,clusters_hist,time,noAdd):
 
-    # If there are no polulated clusters, there is no metric bias to be built.
+    # If there are no populated clusters, there is no metric bias to be built.
     if len(clusters.keys())==0:
        return include, clusters_hist
     else:
@@ -936,32 +942,33 @@ def submit_calc(parameters,iteration):
     os.system(cmd)
 
      
-def combine_trajectories(iteration,parameters):
-    if parameters['md_engine']=='GROMACS':
-  
-       # Combine MD files
-       totaltraj="totaltraj.trr"
-       trajs=glob.glob('iteration'+str(iteration)+'*.trr')
-       print glob.glob('iteration'+str(iteration)+'*.trr')
-       print trajs
-       fileout=open('c.txt','w')
-       c_len=len(trajs)
-       if os.path.isfile(totaltraj):
-          c_len=c_len+1
-       line='c\n'*(c_len)
-       fileout.write(line)
-       fileout.close()
-       if not os.path.isfile(totaltraj):
-          cmd='gmx trjcat -f '+' '.join(trajs)+' -o iteration'+str(iteration)+'.trr -keeplast -cat -settime < c.txt'
+def combine_trajectories(iteration,parameters,restart):
+    if restart==False:
+       if parameters['md_engine']=='GROMACS':
+     
+          # Combine MD files
+          totaltraj="totaltraj.trr"
+          trajs=glob.glob('iteration'+str(iteration)+'*.trr')
+          #print glob.glob('iteration'+str(iteration)+'*.trr')
+          #print trajs
+          fileout=open('c.txt','w')
+          c_len=len(trajs)
+          if os.path.isfile(totaltraj):
+             c_len=c_len+1
+          line='c\n'*(c_len)
+          fileout.write(line)
+          fileout.close()
+          if not os.path.isfile(totaltraj):
+             cmd='gmx trjcat -f '+' '.join(trajs)+' -o iteration'+str(iteration)+'.trr -keeplast -cat -settime < c.txt'
+             os.system(cmd)
+          else:
+             cmd='gmx trjcat -f totaltraj.trr '+' '.join(trajs)+' -o iteration'+str(iteration)+'.trr -keeplast -cat -settime < c.txt'
+             os.system(cmd)
+          cmd='mv iteration'+str(iteration)+'.trr totaltraj.trr'
           os.system(cmd)
-       else:
-          cmd='gmx trjcat -f totaltraj.trr '+' '.join(trajs)+' -o iteration'+str(iteration)+'.trr -keeplast -cat -settime < c.txt'
-          os.system(cmd)
-       cmd='mv iteration'+str(iteration)+'.trr totaltraj.trr'
-       os.system(cmd)
-       if parameters['debug']==False:
-          cmd='rm iteration'+str(iteration)+'*'
-          os.system(cmd)
+          if parameters['debug']==False:
+             cmd='rm iteration'+str(iteration)+'*'
+             os.system(cmd)
        
     # Combine PLUMED COLVAR files
     totalplumed='COLVAR'
@@ -980,37 +987,31 @@ def combine_trajectories(iteration,parameters):
     
     time,metric_list_val,cv_list_val,metric_avg,metric_sd,cv_avg,cv_sd=analyse_plumed_output(parameters,'COLVAR',iteration)
     
-    print time
+    #print time
    
     return cv_list_val, metric_list_val,time
 
-
 def clustering(time,values,iteration,parameters):
+
 
     if parameters['clustering']=='density_Laio':
         #calculate euclidean distances:
+       # print "Memory usage before calculating euclidMat"
+       # print(psutil.virtual_memory()) #only for debug purposes
+ 
         print "Calculating euclidean distances"
-        euclidMat=[]
-        euclidMat_stats=[]
-        for i in range (0,len(values)):
-            euclid=[]
-            for j in range(0,len(values)):
-                if i==j:
-                   euclid.append(99999999.)
-                elif j>i:
-                   euclid.append(numpy.linalg.norm(values[i]-values[j]))
-                   euclidMat_stats.append(numpy.linalg.norm(values[i]-values[j]))
-                elif j<i:
-                   euclid.append(99999999.)
-            euclidMat.append(euclid)
-        euclidMat=numpy.array(euclidMat)
+        #print values
+        #print values.shape
+        euclidMat=spatial.distance.cdist(values,values,'euclidean')
         #print euclidMat
-        #sys.exit()
+        #print euclidMat.shape
+        euclidMat_stats=spatial.distance.pdist(values,'euclidean')
+        #print euclidMat_stats
         euclidMat_avg=numpy.mean(euclidMat_stats)
         euclidMat_sd=numpy.std(euclidMat_stats)
-
         print "euclidMat_avg = ", euclidMat_avg
         print "euclidMat_sd = ", euclidMat_sd
+        #sys.exit()
 
         #calculte rho for each data point
         if parameters['cluster_dc']=='value':
@@ -1029,16 +1030,16 @@ def clustering(time,values,iteration,parameters):
             for j in range(0,len(values)):
                 if j==i:
                    continue
-                elif j>i:
+                elif j<i:
                    #print j, i
                    if euclidMat[i][j]<d0:
                       rhoi=rhoi+1
-                elif j<i:
+                elif j>i:
                    if euclidMat[j][i]<d0:
                       rhoi=rhoi+1
             rho.append(rhoi)
-        #print rho
-        #sys.exit()
+#        print rho
+#        sys.exit()
         
         print "calculating delta"
         #calculate delta for each data point:
@@ -1048,26 +1049,37 @@ def clustering(time,values,iteration,parameters):
             for j in range(0,len(values)):
                 if j==i:
                    continue
-                elif j>i:
+                elif j<i:
                    if (rho[j]>rho[i]) and (euclidMat[i][j]<deltai):
                       deltai=euclidMat[i][j]
-                elif j<i:
+                elif j>i:
                    if (rho[j]>rho[i]) and (euclidMat[j][i]<deltai):
                       deltai=euclidMat[j][i]
             delta.append(deltai)
-
+#        print delta
+#        sys.exit()
         # correct the value for the point with maximum density. 
         #This is done different than in the paper. In the paper
         # the delta value for this point is the distance with
         # the furthest point.
         deltai=0.
-        for i in range(0,len(delta)):
-            if delta[i]!=999999999. and delta[i]>deltai:
-                deltai=delta[i]
-        for i in range(0,len(delta)):
-            if delta[i]==999999999.:
-                delta[i]=deltai
-
+        for i in range(0,len(values)):
+            if rho[i]==max(rho):
+               print "max value ", rho[i], " found in position ", i
+               disti=0.
+               for j in range(0,len(values)):
+                   if j==i:
+                      continue
+                   elif j<i:
+                      distj=euclidMat[i][j]
+                   elif j>i:
+                      distj=euclidMat[j][i]
+                   if distj>disti:
+                      disti=distj
+               delta[i]=disti    
+#        print delta
+#        sys.exit()
+      
         fileout=open('rhodelta.txt','w')
         for i in range(1,len(values)):
             line=str(time[i])+' '+str(rho[i])+' '+str(delta[i])+'\n'
@@ -1186,6 +1198,11 @@ def clustering(time,values,iteration,parameters):
                break
 
         
+    print "Iteration, ", iteration, ". Memory usage after clustering:"
+    print(psutil.virtual_memory()) #only for debug purposes
+    del values, time, euclidMat, rho, delta
+    print "Memory usage after deleting variables:"
+    print(psutil.virtual_memory()) #only for debug purposes
 
     return clusters_forward,outliers_forward,noAdd
 
@@ -1337,12 +1354,22 @@ if __name__ == '__main__':
        metricAvgTarget,metricSDTarget,cvAvgTarget,cvSDTarget=analyse_target(parameters,metric_input)
     else:
        metricAvgTarget,metricSDTarget,cvAvgTarget,cvSDTarget=None,None,None,None
-
-    ######## DO ACTUALLY INTERESTING STUFF (WHEN IT IS NOT CRASHING) ####################
-
+    
+    ##### RESTART CALCULATION IF NECESSARY ###################
+    st_iter=int(parameters['st_iter'])
     include=parameters['include'] # list of biasing potentials
     clusters_hist=parameters['clusters_hist'] # list of sampled clusters (in ps)
-    st_iter=int(parameters['st_iter'])
+    if st_iter>0:
+      restart=True 
+    else:
+      restart=False
+    if restart==True:
+       print "The restarting function is not complete yet. Exiting."
+       sys.exit()
+       cv_arr,metric_arr,time=combine_trajectories(st_iter-1,parameters,True) 
+       clusters,outliers,noAdd=clustering(time,metric_arr,st_iter-1,parameters)
+    ######## DO INTERESTING STUFF (WHEN IT IS NOT CRASHING) ####################
+
     max_iter=int(parameters['max_iter'])
     noAdd=[]
     for iteration in range(st_iter,max_iter):
@@ -1353,7 +1380,7 @@ if __name__ == '__main__':
         taboo_plumedat=gen_plumed_input(parameters,include,clusters_hist,noAdd)
         print "Iteration "+str(iteration)+" is going to be submitted."
         qsub_md=submit_calc(parameters,iteration)  
-        cv_arr,metric_arr,time=combine_trajectories(iteration,parameters)
+        cv_arr,metric_arr,time=combine_trajectories(iteration,parameters,False)
         clusters,outliers,noAdd=clustering(time,metric_arr,iteration,parameters)
         save_clusters(parameters,clusters,'cluster',iteration,noAdd)
         save_clusters(parameters,outliers,'outlier',iteration,noAdd)
