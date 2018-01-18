@@ -22,8 +22,10 @@ sith.py is distributed unfer a GPL license.
 import argparse
 import mdtraj
 import numpy, scipy, math
+from scipy import spatial
 import glob, os, sys
 import time as tiempo
+import psutil
 
 parser = argparse.ArgumentParser(description="Perform an iterative taboo search using the JEDI collective variable",
                                  epilog="sith.py is distributed under a GPL license.",
@@ -190,8 +192,8 @@ ERROR ! The input cannot be found. See usage above.
     if 'st_iter' not in parameters.keys():
         parameters['st_iter']=0
     elif int(parameters['st_iter'])!=0:
-        print "Restarting function has still to be debugged. Do NOT use. Exiting"
-        sys.exit()
+        print "WARNING. Using restarting function still to be debugged!!!!!"
+        #sys.exit()
     if 'clusters_hist' not in parameters.keys(): #history of sampled clusters
         parameters['clusters_hist']={}
     else:
@@ -467,8 +469,30 @@ def setupMetric(parameters):
        else:
           structure=parameters['reference_structure']
  
+       torsion_specs=['SC_list','TOR_list']
+       for spec in torsion_specs:
+           atLeastOne=False
+           if spec not in parameters.keys():
+              parameters[spec]=None
+           else:
+              atLeastOne=True
+       if atLeastOne==False:
+          print "You need to specify how the torsions will be chosen (whole SC (SC_list) or just some TOR (TOR_list)). eXITING."
+          sys.exit()
        if parameters['SC_list'] is not None:
           residues_str=parameters['SC_list'].split(',')
+       elif parameters['TOR_list'] is not None:
+          torsions={}
+          residues_str=[]
+          for residue in parameters['TOR_list'].split(','):
+              res=residue.split(':')[0]
+              residues_str.append(res)
+              torsions[res]=[]
+              for torsion in residue.split(':')[1].split(';'):
+                  torsions[res].append(torsion)
+          print residues_str
+          print torsions
+          #sys.exit()
        elif cv=='JEDI':
           apolar=parameters['apolar']
           polar=parameters['polar']
@@ -495,21 +519,23 @@ def setupMetric(parameters):
            for atom in mdtraj.compute_chi1(struct)[0][i]:
                for at2 in struct.topology.atoms:
                    if int(at2.index)==atom and str(at2.residue) in residues_str:
-                      atoms.append(str(atom+1)) # +1 because they start at 0 in mdtraj but at 1 in GROMACS
-                      name='chi1_'+str(at2.residue)
+                      if parameters['TOR_list']==None or (str(at2.residue) in torsions.keys() and 'chi1' in torsions[str(at2.residue)]):
+                         atoms.append(str(atom+1)) # +1 because they start at 0 in mdtraj but at 1 in GROMACS
+                         name='chi1_'+str(at2.residue)
            if len(atoms)==4:
               chi[name]=atoms
            elif len(atoms)!=0:
               print "something went wrong when assigning dihedrals. A dihedral can't have a number of atoms different than 4"
               break
-
+       
        for i in range(0,len(mdtraj.compute_chi2(struct)[0])):
            atoms=[]
            for atom in mdtraj.compute_chi2(struct)[0][i]:
                for at2 in struct.topology.atoms:
                    if int(at2.index)==atom and str(at2.residue) in residues_str:
-                     atoms.append(str(atom+1)) # +1 because they start at 0 in mdtraj but at 1 in GROMACS
-                     name='chi2_'+str(at2.residue)
+                      if parameters['TOR_list']==None or (str(at2.residue) in torsions.keys() and 'chi2' in torsions[str(at2.residue)]):
+                        atoms.append(str(atom+1)) # +1 because they start at 0 in mdtraj but at 1 in GROMACS
+                        name='chi2_'+str(at2.residue)
            if len(atoms)==4:
               chi[name]=atoms
            elif len(atoms)!=0:
@@ -521,8 +547,9 @@ def setupMetric(parameters):
            for atom in mdtraj.compute_chi3(struct)[0][i]:
                for at2 in struct.topology.atoms:
                    if int(at2.index)==atom and str(at2.residue) in residues_str:
-                      atoms.append(str(atom+1)) # +1 because they start at 0 in mdtraj but at 1 in GROMACS
-                      name='chi3_'+str(at2.residue)
+                      if parameters['TOR_list']==None or (str(at2.residue) in torsions.keys() and 'chi3' in torsions[str(at2.residue)]):
+                         atoms.append(str(atom+1)) # +1 because they start at 0 in mdtraj but at 1 in GROMACS
+                         name='chi3_'+str(at2.residue)
            if len(atoms)==4:
               chi[name]=atoms
            elif len(atoms)!=0:
@@ -534,8 +561,9 @@ def setupMetric(parameters):
            for atom in mdtraj.compute_chi4(struct)[0][i]:
                for at2 in struct.topology.atoms:
                    if int(at2.index)==atom and str(at2.residue) in residues_str:
-                      atoms.append(str(atom+1)) # +1 because they start at 0 in mdtraj but at 1 in GROMACS
-                      name='chi4_'+str(at2.residue)
+                      if parameters['TOR_list']==None or (str(at2.residue) in torsions.keys() and 'chi4' in torsions[str(at2.residue)]):
+                         atoms.append(str(atom+1)) # +1 because they start at 0 in mdtraj but at 1 in GROMACS
+                         name='chi4_'+str(at2.residue)
            if len(atoms)==4:
               chi[name]=atoms
            elif len(atoms)!=0:
@@ -614,9 +642,9 @@ def analyse_plumed_output(parameters, nameIn,iteration):
      
     #FIXME: this is assuming that the main CV is only one AND it is the first one after 'time'. Should not be very difficult to modify.
     filein=open(nameIn,'r')
-    cv_list_val=[]
-    metric_list_val=[]
-    time=[]
+    cv_list_val=None
+    metric_list_val=None
+    time=numpy.array([])
     dt=float(parameters['dt'])
     stride=int(parameters['stride'])
     strideps=dt*stride
@@ -641,21 +669,25 @@ def analyse_plumed_output(parameters, nameIn,iteration):
            elif iteration>0 and float(line[0])==0:
               continue
            time_ps=linum*strideps
-           time.append(time_ps)
+           time=numpy.append(time,time_ps)
            cv_lst_line=[]
            cv_lst_line.append(float(line[1]))
-           cv_list_val.append(cv_lst_line)
-           val_lst_line=[]
+           if cv_list_val is None:
+              cv_list_val=numpy.array(cv_lst_line)
+           else:
+              cv_list_val=numpy.append(cv_list_val,cv_lst_line)
+           val_lst_line=numpy.array([])
            for val in line[2:]:
-               val_lst_line.append(float(val))
-           metric_list_val.append(val_lst_line)
+               val_lst_line=numpy.append(val_lst_line,float(val))
+           if metric_list_val is None:
+              metric_list_val=numpy.array([val_lst_line])
+           else:
+              metric_list_val=numpy.append(metric_list_val,[val_lst_line],axis=0)
         linum=linum+1
 
-    time=numpy.asarray(time)
-    cv_list_val=numpy.asarray(cv_list_val)
-    metric_list_val=numpy.asarray(metric_list_val)
-  
-    #print metric_list_val
+    #time=numpy.asarray(time)
+    #cv_list_val=numpy.asarray(cv_list_val)
+    #metric_list_val=numpy.asarray(metric_list_val)
     #print  type(metric_list_val)
 
     cv_avg=numpy.average(cv_list_val,axis=0)
@@ -666,7 +698,7 @@ def analyse_plumed_output(parameters, nameIn,iteration):
 
     return  time, metric_list_val, cv_list_val, metric_avg, metric_sd, cv_avg, cv_sd
 
-def gen_plumed_input(parameters,include,clusters_hist,noAdd):
+def gen_plumed_input(parameters,include,clusters):
 
     metric=parameters['metric']
     cv=parameters['cv']
@@ -706,15 +738,10 @@ def gen_plumed_input(parameters,include,clusters_hist,noAdd):
           line='res_cv: LOWER_WALLS ARG=cv AT='+str(at_cv)+' KAPPA='+str(kappa_cv)+' STRIDE='+str(mts_cv)+'\n'
           fileout.write(line)
 
-    used_times=[]
-    for it in clusters_hist.keys():
-        for instant in clusters_hist[it]:
-            if instant in used_times:# or instant in noAdd:
-               continue
-            time_str=str(int(instant))
-            line='INCLUDE FILE=dist_metric_'+time_str+'.dat\n'
-            fileout.write(line)
-            used_times.append(instant)
+    for center in clusters.keys():
+        time_str=str(int(center))
+        line='INCLUDE FILE=dist_metric_'+time_str+'.dat\n'
+        fileout.write(line)
 
 
     for bias in include:
@@ -736,117 +763,69 @@ def gen_plumed_input(parameters,include,clusters_hist,noAdd):
     fileout.write(line)
     fileout.close()
 
-def build_metric_bias(parameters,include,clusters,outliers,metric_arr,iteration,metric_input,clusters_hist,time,noAdd):
+def build_metric_bias(parameters,clusters,metric_arr,iteration,metric_input,time):
 
-    # If there are no polulated clusters, there is no metric bias to be built.
+    include=[]
+    # If there are no populated clusters, there is no metric bias to be built.
     if len(clusters.keys())==0:
-       return include, clusters_hist
+       return include
     else:
-       clusters_hist[iteration]=[]
-       for key in clusters.keys():
-              clusters_hist[iteration].append(key)
-
-    all_clust={}
-
-    for key in clusters.keys():
-        all_clust[key]=clusters[key]
-    for key in outliers.keys():
-        all_clust[key]=outliers[key]
-    
-    # Calculate the average distance between cluster/outlier centers. Will push away from this
-    '''
-    clusdist=[]
-    if (all_clust.keys())==1:
        clusdist_avg=parameters['at_metric']
-    else:
-       for time_center1 in all_clust.keys():
-            time_index1=numpy.where(time==time_center1)[0][0]
-            #print time_center, time_index, time[time_index]
-            for time_center2 in all_clust.keys():
-                if time_center2==time_center1:
-                    continue
-                time_index2=numpy.where(time==time_center2)[0][0]
-                dist=numpy.linalg.norm(metric_arr[time_index1]-metric_arr[time_index2])
-                clusdist.append(dist)
-       clusdist_avg=numpy.mean(numpy.array(clusdist).astype(float))
-    '''
-    clusdist_avg=parameters['at_metric']
-    
-
-    # Build bias file  
-
-    if parameters['metric']=="SC_TORSION":
-
-       used_times=[]
-       for it in clusters_hist.keys(): 
-           for time_center in clusters_hist[it]: 
-               if (time_center in used_times):# or (time_center in noAdd):
-                  continue
-               time_str=str(int(time_center))
-               nameOut="dist_metric_"+time_str+".dat"
-               if os.path.isfile(nameOut): #FIXME: Not sure this test is necessary since we are skipping all the times in used_times
-                  continue
-               fileout=open(nameOut,'w')
-               time_index=numpy.where(time==time_center)[0][0]
-               labelstemp=[]
-               loc=0
-               for key in metric_input.keys(): 
-                   line='sin_'+key+'_'+time_str+': MATHEVAL ARG='+key+' FUNC=sin(x)-'+\
-                         metric_arr[time_index][loc].astype(str)+' PERIODIC=NO'+'\n'
-                   #print line
-                   fileout.write(line)
-                   loc += 1
-                   labelstemp.append('sin_'+key+'_'+time_str)
-                   line='cos_'+key+'_'+time_str+': MATHEVAL ARG='+key+' FUNC=cos(x)-'+\
-                         metric_arr[time_index][loc].astype(str)+' PERIODIC=NO'+'\n'
-                   fileout.write(line)
-                   #print line
-                   loc += 1
-                   labelstemp.append('cos_'+key+'_'+time_str)
-               line='dist2_'+time_str+': COMBINE ARG='+','.join(labelstemp)+\
-                ' POWERS='+','.join(['2']*len(metric_arr[time_index]))+' PERIODIC=NO\n'
+       dt=float(parameters['dt'])
+       stride=int(parameters['stride'])
+       strideps=dt*stride
+       sampltime=float(parameters['sampltime'])
+       kappa_metric=float(parameters['kappa_metric'])
+       kappas={}
+       for center in clusters.keys():
+           kappas[center]=(len(clusters[center])*strideps/sampltime)*kappa_metric
+           time_str=str(int(center))
+           nameOut="dist_metric_"+time_str+".dat"
+           fileout=open(nameOut,'w')
+           time_index=numpy.where(time==center)[0][0]
+           labelstemp=[]
+           loc=0
+           for key in metric_input.keys():
+               line='sin_'+key+'_'+time_str+': MATHEVAL ARG='+key+' FUNC=sin(x)-'+\
+                     metric_arr[time_index][loc].astype(str)+' PERIODIC=NO'+'\n'
+               #print line
                fileout.write(line)
-               line='dist_'+time_str+': MATHEVAL ARG=dist2_'+time_str+' FUNC=sqrt(x) PERIODIC=NO'
+               loc += 1
+               labelstemp.append('sin_'+key+'_'+time_str)
+               line='cos_'+key+'_'+time_str+': MATHEVAL ARG='+key+' FUNC=cos(x)-'+\
+                     metric_arr[time_index][loc].astype(str)+' PERIODIC=NO'+'\n'
                fileout.write(line)
-               fileout.close()
-               used_times.append(time_center)
-
-
-    openbias=False
-    for time_center in clusters_hist[iteration]:
-        if time_center in noAdd:
-           continue
-        openbias=True
-    if openbias==False:
-       return include,clusters_hist
-
-       
+               #print line
+               loc += 1
+               labelstemp.append('cos_'+key+'_'+time_str)
+           line='dist2_'+time_str+': COMBINE ARG='+','.join(labelstemp)+\
+               ' POWERS='+','.join(['2']*len(metric_arr[time_index]))+' PERIODIC=NO\n'
+           fileout.write(line)
+           line='dist_'+time_str+': MATHEVAL ARG=dist2_'+time_str+' FUNC=sqrt(x) PERIODIC=NO'
+           fileout.write(line)
+           fileout.close()
+      
     nameOut='metric_bias.'+str(iteration)+'.dat'
     fileout=open(nameOut,'w')
-    for time_center in clusters_hist[iteration]:
-        if time_center in noAdd:
-           continue
-        time_str=str(int(time_center))
+    for center in clusters.keys():
+        time_str=str(int(center))
         if parameters['bias']=='LOWER_WALLS' or parameters['bias']=='UPPER_WALLS' or parameters['bias']=='RESTRAINT':
            line= line='rest_'+time_str+'_'+str(iteration)+': '+parameters['bias']+' ARG=dist_'+time_str+\
-                 ' AT='+str(clusdist_avg)+' KAPPA='+str(parameters['kappa_metric'])+'\n'
+                      ' AT='+str(clusdist_avg)+' KAPPA='+str(kappas[center])+'\n'
         elif parameters['bias']=='MOVINGRESTRAINT_L':
            first=int(int(parameters['nsteps'])*0.2)
            line='MOVINGRESTRAINT ...\n'+\
                 'ARG=dist_'+time_str+'\n'+\
                 'VERSE=L\n'+\
                 'STEP0=0 AT0=0 KAPPA0='+str(parameters['kappa_metric'])+'\n'+\
-                'STEPR1='+str(parameters['nsteps'])+' AT1='+str(clusdist_avg)+' KAPPA1='+str(parameters['kappa_metric'])+'\n'+\
+                'STEP1='+str(parameters['nsteps'])+' AT1='+str(clusdist_avg)+' KAPPA1='+str(kappas[center])+'\n'+\
                 '... MOVINGRESTRAINT\n'
-                #'STEP1='+str(first)+' AT1='+str(clusdist_avg)+' KAPPA1='+str(parameters['kappa_metric'])+'\n'+\
-                #'STEP2='+str(parameters['nsteps'])+' AT2='+str(clusdist_avg)+' KAPPA2='+str(parameters['kappa_metric'])+'\n'+\
-                # I think slowly sampling everything along the reaction coordinate makes more sense than just a short sMD and then a restrained MD at a certain value.
         fileout.write(line)
     fileout.close()
     include.append(nameOut)
-       
 
-    return include,clusters_hist
+    return include
+    
 
 def submit_calc(parameters,iteration):
     nameOut='iteration'+str(iteration)+'.sh'
@@ -910,32 +889,33 @@ def submit_calc(parameters,iteration):
     os.system(cmd)
 
      
-def combine_trajectories(iteration,parameters):
-    if parameters['md_engine']=='GROMACS':
-  
-       # Combine MD files
-       totaltraj="totaltraj.trr"
-       trajs=glob.glob('iteration'+str(iteration)+'*.trr')
-       print glob.glob('iteration'+str(iteration)+'*.trr')
-       print trajs
-       fileout=open('c.txt','w')
-       c_len=len(trajs)
-       if os.path.isfile(totaltraj):
-          c_len=c_len+1
-       line='c\n'*(c_len)
-       fileout.write(line)
-       fileout.close()
-       if not os.path.isfile(totaltraj):
-          cmd='gmx trjcat -f '+' '.join(trajs)+' -o iteration'+str(iteration)+'.trr -keeplast -cat -settime < c.txt'
+def combine_trajectories(iteration,parameters,restart):
+    if restart==False:
+       if parameters['md_engine']=='GROMACS':
+     
+          # Combine MD files
+          totaltraj="totaltraj.trr"
+          trajs=glob.glob('iteration'+str(iteration)+'*.trr')
+          #print glob.glob('iteration'+str(iteration)+'*.trr')
+          #print trajs
+          fileout=open('c.txt','w')
+          c_len=len(trajs)
+          if os.path.isfile(totaltraj):
+             c_len=c_len+1
+          line='c\n'*(c_len)
+          fileout.write(line)
+          fileout.close()
+          if not os.path.isfile(totaltraj):
+             cmd='gmx trjcat -f '+' '.join(trajs)+' -o iteration'+str(iteration)+'.trr -keeplast -cat -settime < c.txt'
+             os.system(cmd)
+          else:
+             cmd='gmx trjcat -f totaltraj.trr '+' '.join(trajs)+' -o iteration'+str(iteration)+'.trr -keeplast -cat -settime < c.txt'
+             os.system(cmd)
+          cmd='mv iteration'+str(iteration)+'.trr totaltraj.trr'
           os.system(cmd)
-       else:
-          cmd='gmx trjcat -f totaltraj.trr '+' '.join(trajs)+' -o iteration'+str(iteration)+'.trr -keeplast -cat -settime < c.txt'
-          os.system(cmd)
-       cmd='mv iteration'+str(iteration)+'.trr totaltraj.trr'
-       os.system(cmd)
-       if parameters['debug']==False:
-          cmd='rm iteration'+str(iteration)+'*'
-          os.system(cmd)
+          if parameters['debug']==False:
+             cmd='rm iteration'+str(iteration)+'*'
+             os.system(cmd)
        
     # Combine PLUMED COLVAR files
     totalplumed='COLVAR'
@@ -954,37 +934,31 @@ def combine_trajectories(iteration,parameters):
     
     time,metric_list_val,cv_list_val,metric_avg,metric_sd,cv_avg,cv_sd=analyse_plumed_output(parameters,'COLVAR',iteration)
     
-    print time
+    #print time
    
     return cv_list_val, metric_list_val,time
 
-
 def clustering(time,values,iteration,parameters):
+
 
     if parameters['clustering']=='density_Laio':
         #calculate euclidean distances:
+       # print "Memory usage before calculating euclidMat"
+       # print(psutil.virtual_memory()) #only for debug purposes
+ 
         print "Calculating euclidean distances"
-        euclidMat=[]
-        euclidMat_stats=[]
-        for i in range (0,len(values)):
-            euclid=[]
-            for j in range(0,len(values)):
-                if i==j:
-                   euclid.append(99999999.)
-                elif j>i:
-                   euclid.append(numpy.linalg.norm(values[i]-values[j]))
-                   euclidMat_stats.append(numpy.linalg.norm(values[i]-values[j]))
-                elif j<i:
-                   euclid.append(99999999.)
-            euclidMat.append(euclid)
-        euclidMat=numpy.array(euclidMat)
+        #print values
+        #print values.shape
+        euclidMat=spatial.distance.cdist(values,values,'euclidean')
         #print euclidMat
-        #sys.exit()
+        #print euclidMat.shape
+        euclidMat_stats=spatial.distance.pdist(values,'euclidean')
+        #print euclidMat_stats
         euclidMat_avg=numpy.mean(euclidMat_stats)
         euclidMat_sd=numpy.std(euclidMat_stats)
-
-        #print "euclidMat_avg = ", euclidMat_avg
-        #print "euclidMat_sd = ", euclidMat_sd
+        print "euclidMat_avg = ", euclidMat_avg
+        print "euclidMat_sd = ", euclidMat_sd
+        #sys.exit()
 
         #calculte rho for each data point
         if parameters['cluster_dc']=='value':
@@ -996,24 +970,25 @@ def clustering(time,values,iteration,parameters):
         elif parameters['cluster_dc']=='avg':
            d0=euclidMat_avg
         
-        
+        print "Calculating rho"
         rho=[]
         for i in range(0,len(values)):
             rhoi=0.
             for j in range(0,len(values)):
                 if j==i:
                    continue
-                elif j>i:
+                elif j<i:
                    #print j, i
                    if euclidMat[i][j]<d0:
                       rhoi=rhoi+1
-                elif j<i:
+                elif j>i:
                    if euclidMat[j][i]<d0:
                       rhoi=rhoi+1
             rho.append(rhoi)
-        print rho
-        sys.exit()
-
+#        print rho
+#        sys.exit()
+        
+        print "calculating delta"
         #calculate delta for each data point:
         delta=[]
         for i in range(0,len(values)):
@@ -1021,26 +996,37 @@ def clustering(time,values,iteration,parameters):
             for j in range(0,len(values)):
                 if j==i:
                    continue
-                elif j>i:
+                elif j<i:
                    if (rho[j]>rho[i]) and (euclidMat[i][j]<deltai):
                       deltai=euclidMat[i][j]
-                elif j<i:
+                elif j>i:
                    if (rho[j]>rho[i]) and (euclidMat[j][i]<deltai):
                       deltai=euclidMat[j][i]
             delta.append(deltai)
-
+#        print delta
+#        sys.exit()
         # correct the value for the point with maximum density. 
         #This is done different than in the paper. In the paper
         # the delta value for this point is the distance with
         # the furthest point.
         deltai=0.
-        for i in range(0,len(delta)):
-            if delta[i]!=999999999. and delta[i]>deltai:
-                deltai=delta[i]
-        for i in range(0,len(delta)):
-            if delta[i]==999999999.:
-                delta[i]=deltai
-
+        for i in range(0,len(values)):
+            if rho[i]==max(rho):
+               print "max value ", rho[i], " found in position ", i
+               disti=0.
+               for j in range(0,len(values)):
+                   if j==i:
+                      continue
+                   elif j<i:
+                      distj=euclidMat[i][j]
+                   elif j>i:
+                      distj=euclidMat[j][i]
+                   if distj>disti:
+                      disti=distj
+               delta[i]=disti    
+#        print delta
+#        sys.exit()
+      
         fileout=open('rhodelta.txt','w')
         for i in range(1,len(values)):
             line=str(time[i])+' '+str(rho[i])+' '+str(delta[i])+'\n'
@@ -1052,7 +1038,8 @@ def clustering(time,values,iteration,parameters):
 
         maxdelta=max(rhodelta[:,2])
         #print "Maximum density is:", maxdelta
-
+        
+        print "getting cluster centers"
         clusterCenters=[]
         for i in range(0,len(values)):
             if delta[i] >= maxdelta*0.95:
@@ -1069,6 +1056,7 @@ def clustering(time,values,iteration,parameters):
        
         #print "Found",len(clusterCenters), "cluster centers"
 
+        print "Assigning snapshots to each cluster center"
         clusters={}
         for center in clusterCenters:
             #print "Found center", center, "at time=", time[center], "picoseconds."
@@ -1090,6 +1078,7 @@ def clustering(time,values,iteration,parameters):
             clusters[time[center]].append(time[i])
 
     #check how many elements are in each cluster
+    print "Deciding if a cluster has been well sampled or it's an outlier"
     totalElements=0
     clusters_forward={}
     outliers_forward={}
@@ -1111,66 +1100,31 @@ def clustering(time,values,iteration,parameters):
     fileout.close()
     NClust=len(clusters_forward.keys())
     Noutli=len(outliers_forward.keys())
-    #print "Total elements clustered:", totalElements, ". Number of observations: ",len(values)," (MUST BE THE SAME)"
-    #print "Number of clusters: ", NClust
-    #print "Number of outliers: ", Noutli
-    #print "---------------------------------------------------------"
+#    print "Total elements clustered:", totalElements, ". Number of observations: ",len(values)," (MUST BE THE SAME)"
+#    print "Number of clusters: ", NClust
+#    print "Number of outliers: ", Noutli
+#    print "---------------------------------------------------------"
 
 
 #    print clusters_forward    
 #    sys.exit()
-    print clusters_forward
-    print "----------------"
-    print outliers_forward
-
-    # Find clusters that are NOT to be printed nor added to the bias file
-    if parameters['debug']==True:
-       clusters_forward=outliers_forward
-    noAdd=[]
-    for key in clusters_forward.keys():
-        if parameters['bias']=='MOVINGRESTRAINT_L': #FIXME: the whole thing is going to crash quickly...
-           break
-        for time_point in clusters[key]:
-            time_str=str(int(time_point))
-            pattern_bias="rest_"+time_str
-            lst=glob.glob('metric_bias.*.dat')
-            lastit=0
-            if len(lst)==0:
-               continue
-            else:
-               for name_bias in lst:
-                   filein=open(name_bias,'r')
-                   for line in filein:
-                       if ':' not in line:
-                           continue
-                       it=int(line.split(':')[0].split('_')[2])
-                       if it>lastit:
-                          lastit=it
-                   filein.close()
-            diffit=iteration-lastit+1
-            timeSinceLast=diffit*float(parameters['simtime'])*float(parameters['nsim'])
-            print "Time since last iter: "+str(timeSinceLast)
-            print "Minimum time: "+parameters['bias_add_freq']
-            if timeSinceLast<float(parameters['bias_add_freq']):
-               noAdd.append(key)
-               break
-
-        
-
-    return clusters_forward,outliers_forward,noAdd
+    print "deleting big variables"
+    del euclidMat, euclidMat_stats
+    return clusters_forward,outliers_forward
 
 
-def save_clusters(parameters,clusters,iteration,noAdd):
+def save_clusters(parameters,clusters,clustype,iteration):
     if parameters['md_engine']=='GROMACS':
        trr='totaltraj.trr'
        tpr=parameters['tpr']
        ndx=parameters['ndx']
        gmx=parameters['gmx_path']
+       namedir='iter'+str(iteration)
+       cmd='mkdir '+namedir
+       os.system(cmd)
        for time in clusters.keys():
-           if time in noAdd:
-              continue
            time=str(int(float(time)))
-           nameOut='center_'+time+'.pdb'
+           nameOut=namedir+'/'+clustype+'_'+time+'.pdb'
            if not os.path.isfile(nameOut): # the time of each center should be the same since we are combining iterations
               cmd=gmx+' trjconv -f '+trr+' -s '+tpr+' -n '+ndx+' -b '+str(int(time))+' -e '+str(int(time))+\
                   ' -pbc mol -ur compact -center -o '+nameOut+'<<OUT\n3\n0\n'
@@ -1307,25 +1261,49 @@ if __name__ == '__main__':
        metricAvgTarget,metricSDTarget,cvAvgTarget,cvSDTarget=analyse_target(parameters,metric_input)
     else:
        metricAvgTarget,metricSDTarget,cvAvgTarget,cvSDTarget=None,None,None,None
-
-    ######## DO ACTUALLY INTERESTING STUFF (WHEN IT IS NOT CRASHING) ####################
-
-    include=parameters['include'] # list of biasing potentials
-    clusters_hist=parameters['clusters_hist'] # list of sampled clusters (in ps)
+    
+    ##### RESTART CALCULATION IF NECESSARY ###################
     st_iter=int(parameters['st_iter'])
+    if st_iter>0:
+#       print "The restarting function is not complete yet. Exiting."
+#       sys.exit()
+       cv_arr,metric_arr,time=combine_trajectories(st_iter-1,parameters,True) 
+       clusters,outliers=clustering(time,metric_arr,st_iter-1,parameters)
+       save_clusters(parameters,clusters,'cluster',st_iter-1)
+       save_clusters(parameters,outliers,'outlier',st_iter-1)
+       generate_restarts(clusters,outliers,st_iter-1,parameters)
+       if parameters['target'] is not None:
+           calc_avg(st_iter,time,clusters,cv_arr,metric_arr,metricAvgTarget,metricSDTarget,cvAvgTarget,cvSDTarget) 
+       nametpr='iteration'+str(st_iter)+'0.tpr'
+       totaltraj="totaltraj.trr"
+       colvarfile="COLVAR"
+       names=[nametpr,totaltraj,colvarfile]
+       for name in names:
+          if not os.path.isfile(name):
+             print "File "+name+" not found. Exiting"
+             sys.exit()
+#       print "The restarting function is not complete yet. Exiting."
+#       sys.exit()
+
+    ######## DO INTERESTING STUFF (WHEN IT IS NOT CRASHING) ####################
+
     max_iter=int(parameters['max_iter'])
-    noAdd=[]
+
     for iteration in range(st_iter,max_iter):
         if iteration>0:
-           include, clusters_hist=build_metric_bias(parameters,include,clusters,outliers,metric_arr,\
-                                                    iteration,metric_input,clusters_hist,time,noAdd)
+           include=build_metric_bias(parameters,clusters,metric_arr,\
+                                     iteration,metric_input,time)
+        else:
+           include=[]
+           clusters={}
 
-        taboo_plumedat=gen_plumed_input(parameters,include,clusters_hist,noAdd)
+        taboo_plumedat=gen_plumed_input(parameters,include,clusters)
         print "Iteration "+str(iteration)+" is going to be submitted."
         qsub_md=submit_calc(parameters,iteration)  
-        cv_arr,metric_arr,time=combine_trajectories(iteration,parameters)
-        clusters,outliers,noAdd=clustering(time,metric_arr,iteration,parameters)
-        save_clusters(parameters,clusters,iteration,noAdd)
+        cv_arr,metric_arr,time=combine_trajectories(iteration,parameters,False)
+        clusters,outliers=clustering(time,metric_arr,iteration,parameters)
+        save_clusters(parameters,clusters,'cluster',iteration)
+        save_clusters(parameters,outliers,'outlier',iteration)
         if parameters['target'] is not None:
            calc_avg(iteration,time,clusters,cv_arr,metric_arr,metricAvgTarget,metricSDTarget,cvAvgTarget,cvSDTarget)
         generate_restarts(clusters,outliers,iteration,parameters)
