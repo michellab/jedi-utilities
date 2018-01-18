@@ -384,7 +384,7 @@ def defineGrid(frame, full, ligand=None, lig_cutoff=5.0, region=None, spacing=0.
                distance=math.sqrt((atom[0]-gridpoint[0])**2+\
                                   (atom[1]-gridpoint[1])**2+\
                                   (atom[2]-gridpoint[2])**2)
-               if distance<=0.3:
+               if distance<=1.0:
                   cropcoords.append(gridpoint)
                   break
        coords=cropcoords
