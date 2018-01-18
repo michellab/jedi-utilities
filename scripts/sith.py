@@ -21,7 +21,9 @@ sith.py is distributed unfer a GPL license.
 
 import argparse
 import mdtraj
-import numpy, scipy, math
+import numpy as np
+np.set_printoptions(threshold='nan')
+import scipy, math
 from scipy import spatial
 import glob, os, sys
 import time as tiempo
@@ -213,7 +215,7 @@ ERROR ! The input cannot be found. See usage above.
                sys.exit
 
     #Getting clustering info    
-    supported_clusterings=['density_Laio']
+    supported_clusterings=['density_Laio','jbeans']
     if 'clustering' not in parameters.keys():
         print "Clustering method not specified. Will use the density method by Rodriguez and Laio (Science (2014), 344(6191) 1492-1496)"
         parameters['clustering']='density_Laio'
@@ -235,7 +237,8 @@ ERROR ! The input cannot be found. See usage above.
           print "The method to calculate dc is not supported."
           print "Currently supported methods are: "+','.join(d0_methods)+". exiting"
           sys.exit()
-    
+    if parameters['clustering']=='jbeans':
+       print "JBeans method (Clark-Nicolas, Jan2018) is still being tested. Be careful."
     if 'sampltime' not in parameters.keys():
         print "The time in ps for which a populated cluster has to be sampled must be defined with option 'sampltime='. Exiting."
         sys.exit()
@@ -644,7 +647,7 @@ def analyse_plumed_output(parameters, nameIn,iteration):
     filein=open(nameIn,'r')
     cv_list_val=None
     metric_list_val=None
-    time=numpy.array([])
+    time=np.array([])
     dt=float(parameters['dt'])
     stride=int(parameters['stride'])
     strideps=dt*stride
@@ -661,6 +664,7 @@ def analyse_plumed_output(parameters, nameIn,iteration):
            else:
               if len(line)!=lenline:
                  message="File '"+nameIn+"' appears to be malformed at time "+str(time)+" ps, probably due to a crash. Skipping line"
+                 print message
                  continue
            if iteration==0 and float(line[0])==0 and skip_first==False:
               skip_first=True
@@ -669,32 +673,32 @@ def analyse_plumed_output(parameters, nameIn,iteration):
            elif iteration>0 and float(line[0])==0:
               continue
            time_ps=linum*strideps
-           time=numpy.append(time,time_ps)
+           time=np.append(time,time_ps)
            cv_lst_line=[]
            cv_lst_line.append(float(line[1]))
            if cv_list_val is None:
-              cv_list_val=numpy.array(cv_lst_line)
+              cv_list_val=np.array(cv_lst_line)
            else:
-              cv_list_val=numpy.append(cv_list_val,cv_lst_line)
-           val_lst_line=numpy.array([])
+              cv_list_val=np.append(cv_list_val,cv_lst_line)
+           val_lst_line=np.array([])
            for val in line[2:]:
-               val_lst_line=numpy.append(val_lst_line,float(val))
+               val_lst_line=np.append(val_lst_line,float(val))
            if metric_list_val is None:
-              metric_list_val=numpy.array([val_lst_line])
+              metric_list_val=np.array([val_lst_line])
            else:
-              metric_list_val=numpy.append(metric_list_val,[val_lst_line],axis=0)
+              metric_list_val=np.append(metric_list_val,[val_lst_line],axis=0)
         linum=linum+1
 
-    #time=numpy.asarray(time)
-    #cv_list_val=numpy.asarray(cv_list_val)
-    #metric_list_val=numpy.asarray(metric_list_val)
+    #time=np.asarray(time)
+    #cv_list_val=np.asarray(cv_list_val)
+    #metric_list_val=np.asarray(metric_list_val)
     #print  type(metric_list_val)
 
-    cv_avg=numpy.average(cv_list_val,axis=0)
-    cv_sd=numpy.std(cv_list_val,axis=0)
+    cv_avg=np.average(cv_list_val,axis=0)
+    cv_sd=np.std(cv_list_val,axis=0)
  
-    metric_avg=numpy.average(metric_list_val,axis=0)
-    metric_sd=numpy.std(metric_list_val,axis=0)      
+    metric_avg=np.average(metric_list_val,axis=0)
+    metric_sd=np.std(metric_list_val,axis=0)      
 
     return  time, metric_list_val, cv_list_val, metric_avg, metric_sd, cv_avg, cv_sd
 
@@ -782,7 +786,7 @@ def build_metric_bias(parameters,clusters,metric_arr,iteration,metric_input,time
            time_str=str(int(center))
            nameOut="dist_metric_"+time_str+".dat"
            fileout=open(nameOut,'w')
-           time_index=numpy.where(time==center)[0][0]
+           time_index=np.where(time==center)[0][0]
            labelstemp=[]
            loc=0
            for key in metric_input.keys():
@@ -941,7 +945,39 @@ def combine_trajectories(iteration,parameters,restart):
 def clustering(time,values,iteration,parameters):
 
 
-    if parameters['clustering']=='density_Laio':
+    if parameters['clustering']=='jbeans':
+       #Get binning parameters
+       max_bins=int(parameters['max_bins'])
+       bin_lower=float(parameters['rbins'].split(',')[0])
+       bin_upper=float(parameters['rbins'].split(',')[1])
+       t_bins=np.linspace(bin_lower,bin_upper,max_bins+1)
+       binindex=np.zeros(values.shape)
+       shp=values.shape
+
+       #Generate the bin indices from the 1D histogram of each component of METRIC
+       for i in range(0,shp[1]):
+           column=values[:,i]
+           binindex[:,i]=np.digitize(column,t_bins)
+       #del values
+           
+       #Assign each element to the relevant bin:
+       clusters={}
+       binsp={}
+       for i in range(0,shp[0]):
+           create=True
+           bini=binindex[i]
+           t=time[i]
+           for key in clusters.keys():
+               if np.array_equal(binsp[key],bini)==True:
+                  clusters[key].append(t)
+                  create=False
+                  break
+           if create==True:
+              clusters[t]=[t]
+              binsp[t]=bini
+
+       
+    elif parameters['clustering']=='density_Laio':
         #calculate euclidean distances:
        # print "Memory usage before calculating euclidMat"
        # print(psutil.virtual_memory()) #only for debug purposes
@@ -954,8 +990,8 @@ def clustering(time,values,iteration,parameters):
         #print euclidMat.shape
         euclidMat_stats=spatial.distance.pdist(values,'euclidean')
         #print euclidMat_stats
-        euclidMat_avg=numpy.mean(euclidMat_stats)
-        euclidMat_sd=numpy.std(euclidMat_stats)
+        euclidMat_avg=np.mean(euclidMat_stats)
+        euclidMat_sd=np.std(euclidMat_stats)
         print "euclidMat_avg = ", euclidMat_avg
         print "euclidMat_sd = ", euclidMat_sd
         #sys.exit()
@@ -1012,7 +1048,7 @@ def clustering(time,values,iteration,parameters):
         deltai=0.
         for i in range(0,len(values)):
             if rho[i]==max(rho):
-               print "max value ", rho[i], " found in position ", i
+               print "max rho value ", rho[i], " found in position ", i
                disti=0.
                for j in range(0,len(values)):
                    if j==i:
@@ -1033,7 +1069,7 @@ def clustering(time,values,iteration,parameters):
             fileout.write(line)
         fileout.close()
 
-        rhodelta=numpy.array([time,rho,delta]).transpose().astype(float)
+        rhodelta=np.array([time,rho,delta]).transpose().astype(float)
         #print rhodelta
 
         maxdelta=max(rhodelta[:,2])
@@ -1076,6 +1112,9 @@ def clustering(time,values,iteration,parameters):
             jmindist=disti.index(mindisti)
             center=clusterCenters[jmindist]
             clusters[time[center]].append(time[i])
+ 
+        print "deleting big variables"
+        del euclidMat, euclidMat_stats
 
     #check how many elements are in each cluster
     print "Deciding if a cluster has been well sampled or it's an outlier"
@@ -1100,16 +1139,14 @@ def clustering(time,values,iteration,parameters):
     fileout.close()
     NClust=len(clusters_forward.keys())
     Noutli=len(outliers_forward.keys())
-#    print "Total elements clustered:", totalElements, ". Number of observations: ",len(values)," (MUST BE THE SAME)"
-#    print "Number of clusters: ", NClust
-#    print "Number of outliers: ", Noutli
+    print "Total elements clustered:", totalElements, ". Number of observations: ",len(values)," (MUST BE THE SAME)"
+    print "Number of clusters: ", NClust
+    print "Number of outliers: ", Noutli
 #    print "---------------------------------------------------------"
 
 
-#    print clusters_forward    
-#    sys.exit()
-    print "deleting big variables"
-    del euclidMat, euclidMat_stats
+    print clusters_forward    
+    #sys.exit()
     return clusters_forward,outliers_forward
 
 
@@ -1164,11 +1201,11 @@ def generate_restarts(clusters,outliers,iteration,parameters):
 #        print "cluster "+str(key)+" has a normalised weight of "+str(norm_weights[key])
 
     if len(inv_weights.keys())>=int(parameters['nsim']):
-       times_restarts=numpy.random.choice(a=norm_weights.keys(),p=norm_weights.values(),size=int(parameters['nsim']),replace=False)
+       times_restarts=np.random.choice(a=norm_weights.keys(),p=norm_weights.values(),size=int(parameters['nsim']),replace=False)
     else:
        rest=int(parameters['nsim'])-len(inv_weights.keys())
-       times_restarts=numpy.random.choice(a=norm_weights.keys(),p=norm_weights.values(),size=len(inv_weights.keys()),replace=False)
-       times_restarts=numpy.append(times_restarts, numpy.random.choice(a=norm_weights.keys(),p=norm_weights.values(),size=rest,replace=True))
+       times_restarts=np.random.choice(a=norm_weights.keys(),p=norm_weights.values(),size=len(inv_weights.keys()),replace=False)
+       times_restarts=np.append(times_restarts, np.random.choice(a=norm_weights.keys(),p=norm_weights.values(),size=rest,replace=True))
     
     if parameters['md_engine']=='GROMACS':
 
@@ -1215,12 +1252,12 @@ def calc_avg(iteration,time,clusters,cv_arr,metric_arr,metricAvgTarget,metricSDT
         cv_vals=[]
         dist_vals=[]
         for time_element in clusters[time_center]:
-            index=numpy.where(time==time_element)[0][0]
+            index=np.where(time==time_element)[0][0]
             cv_vals.append(cv_arr[index])
-            dist=numpy.linalg.norm(metric_arr[index]-metricAvgTarget)
+            dist=np.linalg.norm(metric_arr[index]-metricAvgTarget)
             dist_vals.append(dist)
-        cv_vals=numpy.array(cv_vals).astype(float)
-        dist_vals=numpy.array(dist_vals).astype(float)
+        cv_vals=np.array(cv_vals).astype(float)
+        dist_vals=np.array(dist_vals).astype(float)
         cv_avg=cv_vals.mean()
         cv_sd=cv_vals.std()
         dist_avg=dist_vals.mean()
@@ -1270,7 +1307,7 @@ if __name__ == '__main__':
        cv_arr,metric_arr,time=combine_trajectories(st_iter-1,parameters,True) 
        clusters,outliers=clustering(time,metric_arr,st_iter-1,parameters)
        save_clusters(parameters,clusters,'cluster',st_iter-1)
-       save_clusters(parameters,outliers,'outlier',st_iter-1)
+       #save_clusters(parameters,outliers,'outlier',st_iter-1)
        generate_restarts(clusters,outliers,st_iter-1,parameters)
        if parameters['target'] is not None:
            calc_avg(st_iter,time,clusters,cv_arr,metric_arr,metricAvgTarget,metricSDTarget,cvAvgTarget,cvSDTarget) 
@@ -1303,7 +1340,7 @@ if __name__ == '__main__':
         cv_arr,metric_arr,time=combine_trajectories(iteration,parameters,False)
         clusters,outliers=clustering(time,metric_arr,iteration,parameters)
         save_clusters(parameters,clusters,'cluster',iteration)
-        save_clusters(parameters,outliers,'outlier',iteration)
+        #save_clusters(parameters,outliers,'outlier',iteration)
         if parameters['target'] is not None:
            calc_avg(iteration,time,clusters,cv_arr,metric_arr,metricAvgTarget,metricSDTarget,cvAvgTarget,cvSDTarget)
         generate_restarts(clusters,outliers,iteration,parameters)
