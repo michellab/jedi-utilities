@@ -821,8 +821,8 @@ def build_metric_bias(parameters,clusters,metric_arr,iteration,metric_input,time
            line='MOVINGRESTRAINT ...\n'+\
                 'ARG=dist_'+time_str+'\n'+\
                 'VERSE=L\n'+\
-                'STEP0=0 AT0=0 KAPPA0='+str(parameters['kappa_metric'])+'\n'+\
-                'STEP1='+str(parameters['nsteps'])+' AT1='+str(clusdist_avg)+' KAPPA1='+str(kappas[center])+'\n'+\
+                'STEP0=0 AT0=0 KAPPA0='+str(kappas[center])+'\n'+\
+                'STEP1='+str(parameters['nsteps'])+' AT1='+str(clusdist_avg)+'\n'+\
                 '... MOVINGRESTRAINT\n'
         fileout.write(line)
     fileout.close()
@@ -1151,6 +1151,7 @@ def clustering(time,values,iteration,parameters):
 
 
 def save_clusters(parameters,clusters,clustype,iteration):
+    #FIXME: This is really slow. There must be a way to run several of them at the same time
     if parameters['md_engine']=='GROMACS':
        trr='totaltraj.trr'
        tpr=parameters['tpr']
@@ -1320,7 +1321,7 @@ if __name__ == '__main__':
              print "File "+name+" not found. Exiting"
              sys.exit()
 #       print "The restarting function is not complete yet. Exiting."
-#       sys.exit()
+       #sys.exit()
 
     ######## DO INTERESTING STUFF (WHEN IT IS NOT CRASHING) ####################
 
