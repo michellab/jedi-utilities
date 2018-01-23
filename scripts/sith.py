@@ -782,7 +782,7 @@ def build_metric_bias(parameters,clusters,metric_arr,iteration,metric_input,time
     if len(clusters.keys())==0:
        return include
     else:
-       if parameters['bias']=='LOWER_WALLS' or parameters['bias']=='UPPER_WALLS' or parameters['bias']=='RESTRAINT' or parameters['bias']=='MOVINGRESTRAINT':
+       if parameters['bias']=='LOWER_WALLS' or parameters['bias']=='UPPER_WALLS' or parameters['bias']=='RESTRAINT' or parameters['bias']=='MOVINGRESTRAINT_L':
           clusdist_avg=parameters['at_metric']
           kappa_metric=float(parameters['kappa_metric'])
 
@@ -792,7 +792,7 @@ def build_metric_bias(parameters,clusters,metric_arr,iteration,metric_input,time
        sampltime=float(parameters['sampltime'])
        kappas={}
        for center in clusters.keys():
-           if parameters['bias']=='LOWER_WALLS' or parameters['bias']=='UPPER_WALLS' or parameters['bias']=='RESTRAINT' or parameters['bias']=='MOVINGRESTRAINT':
+           if parameters['bias']=='LOWER_WALLS' or parameters['bias']=='UPPER_WALLS' or parameters['bias']=='RESTRAINT' or parameters['bias']=='MOVINGRESTRAINT_L':
               kappas[center]=(len(clusters[center])*strideps/sampltime)*kappa_metric
            time_str=str(int(center))
            nameOut="dist_metric_"+time_str+".dat"
@@ -824,8 +824,10 @@ def build_metric_bias(parameters,clusters,metric_arr,iteration,metric_input,time
     fileout=open(nameOut,'w')
     for center in clusters.keys():
         time_str=str(int(center))
-        if parameters['bias']=='LOWER_WALLS' or parameters['bias']=='UPPER_WALLS' or parameters['bias']=='RESTRAINT':
-           line= line='rest_'+time_str+'_'+str(iteration)+': '+parameters['bias']+' ARG=dist_'+time_str+\
+        if parameters['bias']==None:
+           break
+        elif parameters['bias']=='LOWER_WALLS' or parameters['bias']=='UPPER_WALLS' or parameters['bias']=='RESTRAINT':
+           line='rest_'+time_str+'_'+str(iteration)+': '+parameters['bias']+' ARG=dist_'+time_str+\
                       ' AT='+str(clusdist_avg)+' KAPPA='+str(kappas[center])+'\n'
         elif parameters['bias']=='MOVINGRESTRAINT_L':
            first=int(int(parameters['nsteps'])*0.2)
