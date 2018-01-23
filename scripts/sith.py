@@ -930,7 +930,8 @@ def submit_calc(parameters,iteration):
 def combine_trajectories(iteration,parameters,restart):
     if restart==False:
        if parameters['md_engine']=='GROMACS':
-     
+          
+          gmx=parameters['gmx_path'] 
           # Combine MD files
           totaltraj="totaltraj.trr"
           trajs=glob.glob('iteration'+str(iteration)+'*.trr')
@@ -944,10 +945,10 @@ def combine_trajectories(iteration,parameters,restart):
           fileout.write(line)
           fileout.close()
           if not os.path.isfile(totaltraj):
-             cmd='gmx trjcat -f '+' '.join(trajs)+' -o iteration'+str(iteration)+'.trr -keeplast -cat -settime < c.txt'
+             cmd=gmx+' trjcat -f '+' '.join(trajs)+' -o iteration'+str(iteration)+'.trr -keeplast -cat -settime < c.txt'
              os.system(cmd)
           else:
-             cmd='gmx trjcat -f totaltraj.trr '+' '.join(trajs)+' -o iteration'+str(iteration)+'.trr -keeplast -cat -settime < c.txt'
+             cmd=gmx+' trjcat -f totaltraj.trr '+' '.join(trajs)+' -o iteration'+str(iteration)+'.trr -keeplast -cat -settime < c.txt'
              os.system(cmd)
           cmd='mv iteration'+str(iteration)+'.trr totaltraj.trr'
           os.system(cmd)
