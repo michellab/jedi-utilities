@@ -212,7 +212,7 @@ ERROR ! The input cannot be found. See usage above.
         for bias in parameters['include']:
             if not os.path.isfile(bias):
                print "Biasing file '"+bias+"' needed and not found. Exiting"
-               sys.exit
+               sys.exit()
 
     #Getting clustering info    
     supported_clusterings=['density_Laio','jbeans']
@@ -290,10 +290,6 @@ def setup_queue(parameters):
        if 'qsub' not in parameters.keys():
           print "looking for qsub in /opt/pbs/12.2.401.141761/bin/qsub"
           parameters['qsub']='/opt/pbs/12.2.401.141761/bin/qsub'
-          
-           
-
-       
 
     return parameters
 
@@ -392,7 +388,7 @@ def getCV(parameters):
           parameters['gridstride']='0'
 
        if 'metaD_sigma' not in parameters.keys():
-          parameters['metaD_sigma']=None
+          parameters['metaD_sigma']='0.05'
 
        if 'dumpderivatives' not in parameters.keys():
           parameters['dumpderivatives']='0'
@@ -424,7 +420,7 @@ def getMetric(parameters):
     return parameters
 
 def getBias(prameters):
-    supported_biases=['RESTRAINT','LOWER_WALLS','UPPER_WALLS','MOVINGRESTRAINT_L']
+    supported_biases=['RESTRAINT','LOWER_WALLS','UPPER_WALLS','MOVINGRESTRAINT_L','metaD']
     if 'bias' not in parameters.keys():
        print "CV biasing method was not chosen. It is not going to be biased."
        parameters['bias']=None
@@ -452,7 +448,16 @@ def getBias(prameters):
        if 'kappa_metric' not in parameters.keys():
            print "KAPPA for metric not specified. setting it to 100 kJ/(mol*(nm**2))"
            parameters['kappa_metric']=100
-    
+    elif bias=='metaD':
+         if 'metaD_sigma' not in parameters.keys():
+            print "MetaD sigma not specified. Using 0.05 (default in plumed tutorials, might not be suitable)"
+            parameters['metaD_sigma']='0.05'
+         if 'metaD_height' not in parameters.keys(): 
+            print "MetaD height not specified. Using 0.3 (default in plumed tutorials, might not be suitable)"
+            parameters['metaD_height']='0.3'
+         if 'metaD_pace' not in parameters.keys():
+            print "MetaD pace not specified. Using 500 steps (default in plumed tutorials, might not be suitable)"
+            parameters['metaD_pace']='500'
     return parameters
     
 
@@ -711,6 +716,9 @@ def gen_plumed_input(parameters,include,clusters):
 
     fileout=open('taboo_bias.dat','w')
     
+    if parameters['bias']=='metaD' and iteration>1:
+       fileout.write('RESTART\n')
+    
     fileout.write('INCLUDE FILE=metric.dat\n')    
 
     if cv=="JEDI":
@@ -774,15 +782,18 @@ def build_metric_bias(parameters,clusters,metric_arr,iteration,metric_input,time
     if len(clusters.keys())==0:
        return include
     else:
-       clusdist_avg=parameters['at_metric']
+       if parameters['bias']=='LOWER_WALLS' or parameters['bias']=='UPPER_WALLS' or parameters['bias']=='RESTRAINT' or parameters['bias']=='MOVINGRESTRAINT':
+          clusdist_avg=parameters['at_metric']
+          kappa_metric=float(parameters['kappa_metric'])
+
        dt=float(parameters['dt'])
        stride=int(parameters['stride'])
        strideps=dt*stride
        sampltime=float(parameters['sampltime'])
-       kappa_metric=float(parameters['kappa_metric'])
        kappas={}
        for center in clusters.keys():
-           kappas[center]=(len(clusters[center])*strideps/sampltime)*kappa_metric
+           if parameters['bias']=='LOWER_WALLS' or parameters['bias']=='UPPER_WALLS' or parameters['bias']=='RESTRAINT' or parameters['bias']=='MOVINGRESTRAINT':
+              kappas[center]=(len(clusters[center])*strideps/sampltime)*kappa_metric
            time_str=str(int(center))
            nameOut="dist_metric_"+time_str+".dat"
            fileout=open(nameOut,'w')
@@ -824,10 +835,25 @@ def build_metric_bias(parameters,clusters,metric_arr,iteration,metric_input,time
                 'STEP0=0 AT0=0 KAPPA0='+str(kappas[center])+'\n'+\
                 'STEP1='+str(parameters['nsteps'])+' AT1='+str(clusdist_avg)+'\n'+\
                 '... MOVINGRESTRAINT\n'
+        elif parameters['bias']=='metaD':
+           if iteration<=1:
+              line='METAD ...\n'+\
+                   'ARG=dist_'+time_str+'\n'+\
+                   'SIGMA='+parameters['metaD_sigma']+' HEIGHT='+parameters['metaD_height']+' PACE='+parameters['metaD_pace']+'\n'+\
+                   'FILE=HILLS_dist'+time_str+' WALKERS_MPI WALKERS_DIR=./'+'\n'+\
+                   '... METAD\n'
+           else:
+              cmd='cp HILLS_dist'+time_str+' HILLS_dist'+time_str+'.'+str(iteration-1)
+              os.system(cmd)
+              line='METAD ...\n'+\
+                   'ARG=dist_'+time_str+'\n'+\
+                   'SIGMA='+parameters['metaD_sigma']+' HEIGHT='+parameters['metaD_height']+' PACE='+parameters['metaD_pace']+'\n'+\
+                   'FILE=HILLS_dist'+time_str+' WALKERS_MPI WALKERS_DIR=./'+'\n'+\
+                   '... METAD\n'
         fileout.write(line)
     fileout.close()
     include.append(nameOut)
-
+    #sys.exit()
     return include
     
 
@@ -963,6 +989,17 @@ def clustering(time,values,iteration,parameters):
        #Assign each element to the relevant bin:
        clusters={}
        binsp={}
+       
+       if iteration>0:
+          nameIn='bins.'+str(iteration-1)
+          filein=open(nameIn,'r')
+          for line in filein:
+              line=line.split()
+              t=float(line[0])
+              b=np.array(line[1:]).astype(np.float)
+              binsp[t]=b
+              clusters[t]=[]
+
        for i in range(0,shp[0]):
            create=True
            bini=binindex[i]
@@ -976,7 +1013,13 @@ def clustering(time,values,iteration,parameters):
               clusters[t]=[t]
               binsp[t]=bini
 
-       
+       binsfile='bins.'+str(iteration)
+       fileout=open(binsfile,'w')
+       for key in sorted(binsp.keys()):
+           line=str(key)+' '+np.array2string(binsp[key]).strip('[').strip(']')+'\n'
+           fileout.write(line)
+       fileout.close()
+
     elif parameters['clustering']=='density_Laio':
         #calculate euclidean distances:
        # print "Memory usage before calculating euclidMat"
@@ -1160,9 +1203,12 @@ def save_clusters(parameters,clusters,clustype,iteration):
        namedir='iter'+str(iteration)
        cmd='mkdir '+namedir
        os.system(cmd)
+       pdbfiles=glob.glob('iter*/*')
        for time in clusters.keys():
            time=str(int(float(time)))
            nameOut=namedir+'/'+clustype+'_'+time+'.pdb'
+           if nameOut in pdbfiles:
+              continue
            if not os.path.isfile(nameOut): # the time of each center should be the same since we are combining iterations
               cmd=gmx+' trjconv -f '+trr+' -s '+tpr+' -n '+ndx+' -b '+str(int(time))+' -e '+str(int(time))+\
                   ' -pbc mol -ur compact -center -o '+nameOut+'<<OUT\n3\n0\n'
@@ -1236,9 +1282,11 @@ def generate_restarts(clusters,outliers,iteration,parameters):
        if parameters['debug']==False:
           os.system('rm restart*gro *mdout*')
     
-def calc_avg(iteration,time,clusters,cv_arr,metric_arr,metricAvgTarget,metricSDTarget,cvAvgTarget,cvSDTarget):
+def calc_avg(iteration,time,clusters,typeclust,cv_arr,metric_arr,metricAvgTarget,metricSDTarget,cvAvgTarget,cvSDTarget):
     
-    nameOut='distance_target.'+str(iteration)
+    
+
+    nameOut='distance_target_'+typeclust+'.'+str(iteration)
     fileout=open(nameOut,'w')
 
     fileout.write('Center Time CV_avg CV_sd Superposition_CV Dist_metric_avg Dist_metric_sd Superposition_metric')
@@ -1248,7 +1296,7 @@ def calc_avg(iteration,time,clusters,cv_arr,metric_arr,metricAvgTarget,metricSDT
     metric_avgs=[]
     metric_sds=[]   
 
-    for time_center in clusters.keys():
+    for time_center in sorted(clusters.keys()):
         fileout.write('\n')
         cv_vals=[]
         dist_vals=[]
@@ -1311,7 +1359,8 @@ if __name__ == '__main__':
        #save_clusters(parameters,outliers,'outlier',st_iter-1)
        generate_restarts(clusters,outliers,st_iter-1,parameters)
        if parameters['target'] is not None:
-           calc_avg(st_iter,time,clusters,cv_arr,metric_arr,metricAvgTarget,metricSDTarget,cvAvgTarget,cvSDTarget) 
+           calc_avg(st_iter-1,time,clusters,'clusters',cv_arr,metric_arr,metricAvgTarget,metricSDTarget,cvAvgTarget,cvSDTarget) 
+           calc_avg(st_iter-1,time,outliers,'outliers',cv_arr,metric_arr,metricAvgTarget,metricSDTarget,cvAvgTarget,cvSDTarget) 
        nametpr='iteration'+str(st_iter)+'0.tpr'
        totaltraj="totaltraj.trr"
        colvarfile="COLVAR"
@@ -1343,5 +1392,6 @@ if __name__ == '__main__':
         save_clusters(parameters,clusters,'cluster',iteration)
         #save_clusters(parameters,outliers,'outlier',iteration)
         if parameters['target'] is not None:
-           calc_avg(iteration,time,clusters,cv_arr,metric_arr,metricAvgTarget,metricSDTarget,cvAvgTarget,cvSDTarget)
+           calc_avg(iteration,time,clusters,'clusters',cv_arr,metric_arr,metricAvgTarget,metricSDTarget,cvAvgTarget,cvSDTarget)
+           calc_avg(iteration,time,outliers,'outliers',cv_arr,metric_arr,metricAvgTarget,metricSDTarget,cvAvgTarget,cvSDTarget)
         generate_restarts(clusters,outliers,iteration,parameters)
