@@ -182,6 +182,12 @@ ERROR ! The input cannot be found. See usage above.
     if not os.path.isfile(parameters['plumed_exec']):
         print "WARNING! PLUMED executable not found." 
         print "You might be able to continue if you didn't specify a target AND you are sure that your MD code is patched."
+        proceed=raw_input("Do you want to continue?[y/n]\n")
+        while proceed is not "y" and proceed is not "n":
+              proceed=raw_input("Please say y or n.  Do you want to continue?[y/n]\n")
+        if proceed is "n":
+              print "User selected not to continue. Aborting."
+              sys.exit()
 
     
     # MPI related stuff
