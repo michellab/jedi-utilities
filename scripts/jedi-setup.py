@@ -413,7 +413,7 @@ def defineGrid(frame, full, ligand=None, lig_cutoff=5.0, region=None, spacing=0.
     grid = mdtraj.Trajectory(xyz, top)
     return grid, mincoords, maxcoords
 
-def selectPolarApolar(frame, grid_min, grid_max, ligand=None,ligname):
+def selectPolarApolar(frame, grid_min, grid_max, ligand=None,ligname=None):
     """Input: frame: a mdtraj frame
               grid_min: minimum grid coordinates
               grid_max: maximim grid coordinates
