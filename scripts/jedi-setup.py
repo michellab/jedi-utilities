@@ -41,6 +41,9 @@ optional arguments:
   -fp [POCKET] --fpocket [POCKET]
                         Generate the grid and the binding site from a
                         PDB file containing fpocket alpha spheres.
+  -ln [LIGANDNAME] --ligandname [LIGANDNAME]
+                        In liganded simulations, skip the residues with
+                        the name of the ligand
 
 jedi-setup.py is distributed under the GPL.
 
@@ -94,6 +97,8 @@ parser.add_argument('-f', '--full',nargs="?",
                     help="Generate a grid that overlaps the whole protein")
 parser.add_argument('-fp', '--fpocket',nargs="?",
                     help="Generate the grid and the binding site from a PDB file containing fpocket alpha spheres.")
+parser.add_argument('-ln', '--ligandname',nargs="?",
+                    help="Skip the residues that have the name of the ligand")
 
 def parse(parser):
     args = parser.parse_args()
@@ -179,7 +184,8 @@ ERROR ! The -k flag can only have "yes" or "no". Default is "yes".
    
     print (args)
     return args.input, args.ligand, float(args.cutoff), args.region, float(args.spacing),\
-        args.apolar,args.polar,args.grid,args.ignore_waters,args.crop,args.full,args.fpocket
+        args.apolar,args.polar,args.grid,args.ignore_waters,args.crop,args.full,args.fpocket,\
+        args.ligandname
 
 
 def loadStructure(pdbfile,origin=None):
@@ -407,7 +413,7 @@ def defineGrid(frame, full, ligand=None, lig_cutoff=5.0, region=None, spacing=0.
     grid = mdtraj.Trajectory(xyz, top)
     return grid, mincoords, maxcoords
 
-def selectPolarApolar(frame, grid_min, grid_max, ligand=None):
+def selectPolarApolar(frame, grid_min, grid_max, ligand=None,ligname):
     """Input: frame: a mdtraj frame
               grid_min: minimum grid coordinates
               grid_max: maximim grid coordinates
@@ -421,6 +427,8 @@ def selectPolarApolar(frame, grid_min, grid_max, ligand=None):
     polar_list = []
     apolar_list = []
     for i in range(0,frame.n_atoms):
+        if frame.topology.atom(i).residue.name==ligname:
+           continue
         atcoord = frame.xyz[0][i]
         if (atcoord[0] > grid_min[0] and
             atcoord[0] < grid_max[0] and
@@ -440,9 +448,9 @@ def selectPolarApolar(frame, grid_min, grid_max, ligand=None):
                           apolar_list.append(i)
                        break
             else:
-               if frame.topology.atom(i).element.symbol in ['N','O']:
+               if (frame.topology.atom(i).element.symbol in ['N','O']):
                    polar_list.append(i)
-               elif frame.topology.atom(i).element.symbol in ['C','S']:
+               elif (frame.topology.atom(i).element.symbol in ['C','S']):
                    apolar_list.append(i)
     #print polar_list
     #print apolar_list
@@ -549,7 +557,7 @@ if __name__ == '__main__':
     print ("*** jedi setup beginning *** ")
     # Parse command line arguments
     system_pdb, ligand_pdb, lig_cutoff, region_dim, spacing,\
-        apolar_pdb, polar_pdb, grid_pdb, wat, crop, full, fpocket_pdb = parse(parser)
+        apolar_pdb, polar_pdb, grid_pdb, wat, crop, full, fpocket_pdb, ligname = parse(parser)
     # Load protein coordinates
     system,bfact = loadStructure(system_pdb)
 
@@ -589,7 +597,7 @@ if __name__ == '__main__':
     grid_data = defineGrid(system,full,ligand=ligand, lig_cutoff=lig_cutoff,\
                                    region=region, spacing=spacing,fpocket=fpocket,bfact=bfact)
     polar, polar_indices, apolar, apolar_indices =\
-        selectPolarApolar(system, grid_data[1], grid_data[2],ligand)
+        selectPolarApolar(system, grid_data[1], grid_data[2],ligand,ligname)
     # Now center grid on COM of polar+apolar region
     centerGrid(grid_data, polar, apolar)
     #sys.exit(-1)
