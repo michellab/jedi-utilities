@@ -404,9 +404,9 @@ def defineGrid(frame, full, ligand=None, lig_cutoff=5.0, region=None, spacing=0.
     # build one mdtraj.topology.residue
     residue = top.add_residue("GRI", chain)
     # build N mdtraj.topology.atoms
-    germanium = mdtraj.element.germanium
+    hydrogen = mdtraj.element.hydrogen
     for i in range(0,Ngrid):
-        top.add_atom("GRI", germanium, residue)
+        top.add_atom("GRI", hydrogen, residue)
     # Loop over every atom in the topology and create a xyz np array
     xyz = numpy.array(coords)#, dfloat=float32)
     # Find a way to build a mdtraj.traj from top + xyz
