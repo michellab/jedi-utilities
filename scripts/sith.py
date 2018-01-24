@@ -37,6 +37,8 @@ parser.add_argument('-i','--input', nargs="?",
                     help='input file')
 parser.add_argument('-d','--debug',action='store_true',
                     help='Do not remove any files (rename them if necessary)')
+parser.add_argument('-c','--crash',action='store_true',
+                    help='Stop if a simulation crashes')
 
 # Funtions that make your life easier
 
@@ -51,7 +53,7 @@ def isfloat(value):
 def parse(parser):
 
     args = parser.parse_args()
-    print args.debug
+    #print args.debug
     if args.input is None:
         parser.print_help()
         print ("""@@@
@@ -70,6 +72,7 @@ ERROR ! The input cannot be found. See usage above.
            parameters['debug']=True
         else:
            parameters['debug']=False
+        
         filein=open(args.input,'r')
         for line in filein:
             if line.startswith('#') or line=="\n":
@@ -90,6 +93,15 @@ ERROR ! The input cannot be found. See usage above.
                 sys.exit()
             
             parameters[line[0]]=line[1]
+
+    if args.crash is True:
+       print "SITH is going to stop if maximum number of allowed crashes is reached."
+       parameters['crash']=True
+       if 'max_crashes' not in parameters.keys():
+           print "The maximum number of crashes is not specified. Setting it to 1."
+       else:
+           parameters['max_crashes']=int(parameters['max_crashes'])
+           print "The maximum number of allowed crashes is ", parameters['max_crashes']
 
     # Getting Target extension           
     supported_target_extensions=['pdb','gro','trr','dcd','crd','crdbox','g96','trr','trj','xtc']
@@ -745,13 +757,13 @@ def gen_plumed_input(parameters,include,clusters):
        fileout.write(line)
     
     if parameters['debug']==False and bias is not None:
-       if bias=="LOWER_WALLS" or bias=="UPPER_WALLS" or bias=="RESTRAINT" or bias=='MOVINGRESTRAINT_L':
+ #      if bias=="LOWER_WALLS" or bias=="UPPER_WALLS" or bias=="RESTRAINT" or bias=='MOVINGRESTRAINT_L':
           at_cv=parameters['at_cv']
           kappa_cv=parameters['kappa_cv']
           mts_cv=parameters['mts_cv']
-          at_metric=parameters['at_metric']
-          kappa_metric=parameters['kappa_metric']
-          mts_metric=parameters['mts_metric']
+          #at_metric=parameters['at_metric']
+          #kappa_metric=parameters['kappa_metric']
+          #mts_metric=parameters['mts_metric']
    
           line='res_cv: LOWER_WALLS ARG=cv AT='+str(at_cv)+' KAPPA='+str(kappa_cv)+' STRIDE='+str(mts_cv)+'\n'
           fileout.write(line)
@@ -865,7 +877,7 @@ def build_metric_bias(parameters,clusters,metric_arr,iteration,metric_input,time
     return include
     
 
-def submit_calc(parameters,iteration):
+def submit_calc(parameters,iteration,crashes):
     nameOut='iteration'+str(iteration)+'.sh'
     fileout=open(nameOut,'w')
     
@@ -923,8 +935,23 @@ def submit_calc(parameters,iteration):
       tiempo.sleep(1) 
       isfi=os.path.isfile(name_time)
     
+    if parameters['crash']==True:
+       max_crashes=parameters['max_crashes']
+       for i in range(0,int(parameters['nsim'])):
+           if not os.path.isfile('iteration'+str(iteration)+str(i)+'.gro'):
+              print "Iteration ", iteration, " crashed at replica ", i
+              if iteration not in crashes.keys():
+                 crashes[iteration]=[i]
+              else:
+                 crashes[iteration].append(i)
+       if len(crashes.keys())>=max_crashes:
+          for key in sorted(crashes.keys()):
+              print "Iteration ", key, " crashed at replicas: ", ','.join(str(replica) for replica in crashes[key]) 
+          print "The maximum number of allowed crashes, ", max_crashes, ", has been reached. Killing program now."
+          sys.exit()
     cmd='rm '+name_time
     os.system(cmd)
+    return crashes
 
      
 def combine_trajectories(iteration,parameters,restart):
@@ -1008,6 +1035,7 @@ def clustering(time,values,iteration,parameters):
               b=np.array(line[1:]).astype(np.float)
               binsp[t]=b
               clusters[t]=[]
+          filein.close()
 
        for i in range(0,shp[0]):
            create=True
@@ -1384,6 +1412,8 @@ if __name__ == '__main__':
     ######## DO INTERESTING STUFF (WHEN IT IS NOT CRASHING) ####################
 
     max_iter=int(parameters['max_iter'])
+   
+    crashes={}
 
     for iteration in range(st_iter,max_iter):
         if iteration>0:
@@ -1395,7 +1425,7 @@ if __name__ == '__main__':
 
         taboo_plumedat=gen_plumed_input(parameters,include,clusters)
         print "Iteration "+str(iteration)+" is going to be submitted."
-        qsub_md=submit_calc(parameters,iteration)  
+        crashes=submit_calc(parameters,iteration,crashes)  
         cv_arr,metric_arr,time=combine_trajectories(iteration,parameters,False)
         clusters,outliers=clustering(time,metric_arr,iteration,parameters)
         save_clusters(parameters,clusters,'cluster',iteration)
