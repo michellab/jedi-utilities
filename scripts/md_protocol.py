@@ -59,13 +59,13 @@ def split_pdb(frame,lignames,cofnames):
         namepdb=cof+'.pdb'
         small_molec.append(cof)
         cof_frame=frame.atom_slice(cofactors_list[cof])
-        cof_frame.save_pdb()
+        cof_frame.save_pdb(namepdb)
         
     for lig in ligands_list.keys():
         namepdb=lig+'.pdb'
         small_molec.append(lig)
         lig_frame=frame.atom_slice(ligands_list[lig])
-        lig_frame.save_pdb()
+        lig_frame.save_pdb(namepdb)
 
     return small_molec
 
@@ -74,7 +74,7 @@ def ligand_topologies(small_molec):
     for element in small_molec:
         cmd='babel -ipdb '+element+'.pdb -omol2 '+element+'.mol2' #FIXME There is a babel python wrapper but I don't know how to use it
         os.system(cmd)
-        cmd='acpype -i '+element+'mol2 -c user'
+        cmd='/home/joan/github/acpype/acpype.py -i '+element+'.mol2'
         os.system(cmd) #FIXME Same as babel
         filecheck=element+'.acpype/'+element+'_GMX.gro'
         if not os.path.isfile(filecheck):
@@ -84,9 +84,11 @@ def ligand_topologies(small_molec):
 
 if __name__=='__main__':
      
-     
+     frame=mdtraj.load_pdb('complex_clean.pdb')
+     lignames=['CDX']
+     cofnames=['ANP'] 
      small_molec=split_pdb(frame,lignames,cofnames)
-
+     ligand_topologies(small_molec)
 
 
 
