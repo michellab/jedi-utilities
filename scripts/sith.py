@@ -361,6 +361,21 @@ def getCV(parameters):
        sys.exit()
     else:
        cv=parameters['cv']
+
+    if (("push_cv_val" in parameters.keys()) and ("push_cv_stride" not in parameters.keys())) or (("push_cv_val" not in parameters.keys()) and ("push_cv_stride" in parameters.keys())):
+       print "push_cv_val and push_cv_stride go together. You can't give one and not the other. Exiting"
+       sys.exit()
+    
+    if "push_cv_val" not in parameters.keys():
+       parameters["push_cv_val"]=0
+    else:
+       parameters["push_cv_val"]=float(parameters["push_cv_val"])
+
+    if "push_cv_stride" not in parameters.keys():
+       parameters["push_cv_stride"]=1
+       parameters["push_cv_val"]=0
+    else:
+       parameters["push_cv_stride"]=int(parameters["push_cv_stride"])
        
     
     if cv=='JEDI':
@@ -732,6 +747,9 @@ def gen_plumed_input(parameters,include,clusters):
     bias=parameters['bias']
     stride=parameters['stride']
 
+    cmd='cp taboo_bias.dat taboo_bias_dat.'+str(iteration-1)
+    os.system(cmd)
+
     fileout=open('taboo_bias.dat','w')
     
     if parameters['bias']=='metaD' and iteration>1:
@@ -758,7 +776,7 @@ def gen_plumed_input(parameters,include,clusters):
     
     if parameters['debug']==False and bias is not None:
  #      if bias=="LOWER_WALLS" or bias=="UPPER_WALLS" or bias=="RESTRAINT" or bias=='MOVINGRESTRAINT_L':
-          at_cv=parameters['at_cv']
+          at_cv=float(parameters['at_cv'])+iteration/parameters["push_cv_stride"]*parameters["push_cv_val"]
           kappa_cv=parameters['kappa_cv']
           mts_cv=parameters['mts_cv']
           #at_metric=parameters['at_metric']
@@ -935,7 +953,7 @@ def submit_calc(parameters,iteration,crashes):
       tiempo.sleep(1) 
       isfi=os.path.isfile(name_time)
     
-    if parameters['crash']==True:
+    if 'crash' in parameters.keys() and parameters['crash']==True:
        max_crashes=parameters['max_crashes']
        for i in range(0,int(parameters['nsim'])):
            if not os.path.isfile('iteration'+str(iteration)+str(i)+'.gro'):
@@ -954,7 +972,7 @@ def submit_calc(parameters,iteration,crashes):
     return crashes
 
      
-def combine_trajectories(iteration,parameters,restart):
+def combine_trajectories(iteration,parameters,restart,cvAvgTarget,metricAvgTarget):
     if restart==False:
        if parameters['md_engine']=='GROMACS':
           
@@ -1000,7 +1018,20 @@ def combine_trajectories(iteration,parameters,restart):
     
     time,metric_list_val,cv_list_val,metric_avg,metric_sd,cv_avg,cv_sd=analyse_plumed_output(parameters,'COLVAR',iteration)
     
-    #print time
+    if (cvAvgTarget is not None) and (metricAvgTarget is not None):
+       fileout=open('distance_target.txt','w')
+       fileout.write("Time dist_CV dist_metric")
+       for i in range(0,len(time)):
+           t_str=str(time[i])
+           dist_cv=np.linalg.norm(cv_list_val[i]-cvAvgTarget)
+           dist_cv_str=str(dist_cv)
+           dist_metric=np.linalg.norm(metric_list_val[i]-metricAvgTarget)
+           dist_metric_str=str(dist_metric)
+           line='\n'+t_str+' '+dist_cv_str+' '+dist_metric_str
+           fileout.write(line)
+       fileout.close()
+        
+        
    
     return cv_list_val, metric_list_val,time
 
@@ -1390,7 +1421,7 @@ if __name__ == '__main__':
     if st_iter>0:
 #       print "The restarting function is not complete yet. Exiting."
 #       sys.exit()
-       cv_arr,metric_arr,time=combine_trajectories(st_iter-1,parameters,True) 
+       cv_arr,metric_arr,time=combine_trajectories(st_iter-1,parameters,True,cvAvgTarget,metricAvgTarget) 
        clusters,outliers=clustering(time,metric_arr,st_iter-1,parameters)
        save_clusters(parameters,clusters,'cluster',st_iter-1)
        #save_clusters(parameters,outliers,'outlier',st_iter-1)
@@ -1426,7 +1457,7 @@ if __name__ == '__main__':
         taboo_plumedat=gen_plumed_input(parameters,include,clusters)
         print "Iteration "+str(iteration)+" is going to be submitted."
         crashes=submit_calc(parameters,iteration,crashes)  
-        cv_arr,metric_arr,time=combine_trajectories(iteration,parameters,False)
+        cv_arr,metric_arr,time=combine_trajectories(iteration,parameters,False,cvAvgTarget,metricAvgTarget)
         clusters,outliers=clustering(time,metric_arr,iteration,parameters)
         save_clusters(parameters,clusters,'cluster',iteration)
         #save_clusters(parameters,outliers,'outlier',iteration)
