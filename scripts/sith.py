@@ -15,7 +15,7 @@ optional arguments
 sith.py is distributed unfer a GPL license.
 
  @DEPENDENCIES:
- mdtraj, numpy, scipy
+ mdtraj, numpy, scipy, pymp
 
 """
 
@@ -28,6 +28,7 @@ from scipy import spatial
 import glob, os, sys
 import time as tiempo
 import psutil
+import pymp #https://github.com/classner/pymp.git
 
 parser = argparse.ArgumentParser(description="Perform an iterative taboo search using the JEDI collective variable",
                                  epilog="sith.py is distributed under a GPL license.",
@@ -233,7 +234,7 @@ ERROR ! The input cannot be found. See usage above.
                sys.exit()
 
     #Getting clustering info    
-    supported_clusterings=['density_Laio','jbeans']
+    supported_clusterings=['density_Laio','jbeans','jcircles']
     if 'clustering' not in parameters.keys():
         print "Clustering method not specified. Will use the density method by Rodriguez and Laio (Science (2014), 344(6191) 1492-1496)"
         parameters['clustering']='density_Laio'
@@ -256,7 +257,12 @@ ERROR ! The input cannot be found. See usage above.
           print "Currently supported methods are: "+','.join(d0_methods)+". exiting"
           sys.exit()
     if parameters['clustering']=='jbeans':
-       print "JBeans method (Clark-Nicolas, Jan2018) is still being tested. Be careful."
+       print "JBeans method (Clark-Nicolas, Jan2018) seems to work but only with small bins which gives thousands of useless structures. JCircles (Clark-Nicolas, Mar2018) recommended instead."
+    if parameters['clustering']=='jcircles':
+       print "JCircles method (Clark-Nicolas, Mar2018) is still being tested. Be careful."
+       if 'cluster_dc' not in parameters.keys():
+           print "Please specify a dc value for the clustering (positive float). Exiting."
+           sys.exit()
     if 'sampltime' not in parameters.keys():
         print "The time in ps for which a populated cluster has to be sampled must be defined with option 'sampltime='. Exiting."
         sys.exit()
@@ -454,9 +460,19 @@ def getMetric(parameters):
 
 def getBias(prameters):
     supported_biases=['RESTRAINT','LOWER_WALLS','UPPER_WALLS','MOVINGRESTRAINT_L','metaD']
-    if 'bias' not in parameters.keys():
+    supported_biases_cv=['LOWER_WALLS']
+    if 'bias_cv' not in parameters.keys():
        print "CV biasing method was not chosen. It is not going to be biased."
-       parameters['bias']=None
+       parameters['bias_cv']=None
+    elif parameters['bias_cv'] not in supported_biases:
+       print "ERROR: CV biasing method '"+parameters['bias_cv']+"' is not supported."
+       print "Supported biasing methods for CV are: "+','.join(supported_biases_cv)+". Exiting."
+       sys.exit()
+
+    if 'bias' not in parameters.keys():
+       print "You need to choose a bias for METRIC, otherwise there is no taboo search"
+       print "Supported biasing methods are: "+','.join(supported_biases)+". Exiting."
+       sys.exit()
     elif parameters['bias'] not in supported_biases:
        print "ERROR: biasing method '"+parameters['bias']+"' is not supported."
        print "Supported biasing methods are: "+','.join(supported_biases)+". Exiting."
@@ -740,7 +756,7 @@ def analyse_plumed_output(parameters, nameIn,iteration):
 
     return  time, metric_list_val, cv_list_val, metric_avg, metric_sd, cv_avg, cv_sd
 
-def gen_plumed_input(parameters,include,clusters):
+def gen_plumed_input(parameters,include,clusters,bias_keys):
 
     metric=parameters['metric']
     cv=parameters['cv']
@@ -774,7 +790,7 @@ def gen_plumed_input(parameters,include,clusters):
        line=line+'\n'
        fileout.write(line)
     
-    if parameters['debug']==False and bias is not None:
+    if parameters['debug']==False and parameters['bias_cv'] is not None:
  #      if bias=="LOWER_WALLS" or bias=="UPPER_WALLS" or bias=="RESTRAINT" or bias=='MOVINGRESTRAINT_L':
           at_cv=float(parameters['at_cv'])+iteration/parameters["push_cv_stride"]*parameters["push_cv_val"]
           kappa_cv=parameters['kappa_cv']
@@ -807,13 +823,25 @@ def gen_plumed_input(parameters,include,clusters):
     else:
        metric_lab=metric_input.keys()
 
-    line='PRINT ARG=cv,'+','.join(metric_lab)+' STRIDE='+stride+' FILE=COLVAR'
+    if len(bias_keys)>0:
+       line='metric_bias: COMBINE ARG='+','.join(bias_keys)+\
+            ' POWERS='+','.join(['1']*len(bias_keys))+' PERIODIC=NO'+'\n'
+       fileout.write(line)
+    else:
+       line='metric_bias: MATHEVAL ARG=cv FUNC=0*x PERIODIC=NO\n'
+       fileout.write(line)
+
+    line='PRINT ARG=metric_bias STRIDE='+stride+' FILE=total_bias\n'
+    fileout.write(line)   
+
+    line='PRINT ARG=cv,'+','.join(metric_lab)+' STRIDE='+stride+' FILE=COLVAR\n'
     fileout.write(line)
     fileout.close()
 
 def build_metric_bias(parameters,clusters,metric_arr,iteration,metric_input,time):
 
     include=[]
+    bias_keys=[]
     # If there are no populated clusters, there is no metric bias to be built.
     if len(clusters.keys())==0:
        return include
@@ -889,10 +917,11 @@ def build_metric_bias(parameters,clusters,metric_arr,iteration,metric_input,time
                    'FILE=HILLS_dist'+time_str+' WALKERS_MPI WALKERS_DIR=./'+'\n'+\
                    '... METAD\n'
         fileout.write(line)
+        bias_keys.append('rest_'+time_str+'_'+str(iteration)+'.bias') 
     fileout.close()
     include.append(nameOut)
     #sys.exit()
-    return include
+    return include, bias_keys
     
 
 def submit_calc(parameters,iteration,crashes):
@@ -1015,6 +1044,10 @@ def combine_trajectories(iteration,parameters,restart,cvAvgTarget,metricAvgTarge
     if parameters['debug']==False:
        cmd='rm COLVAR.*'
        os.system(cmd)
+
+    for txt in glob.glob('total_bias*'):
+        cmd='mv '+txt+' iteration'+str(iteration)+'_'+txt+'.txt'
+        os.system(cmd)
     
     time,metric_list_val,cv_list_val,metric_avg,metric_sd,cv_avg,cv_sd=analyse_plumed_output(parameters,'COLVAR',iteration)
     
@@ -1035,10 +1068,71 @@ def combine_trajectories(iteration,parameters,restart,cvAvgTarget,metricAvgTarge
    
     return cv_list_val, metric_list_val,time
 
+#FIXME: This function is out of the clustering function because it is recursive. Someone think of a way to put it in
+def jcircles(data,groups,indices,centers,dc):
+    #print "new iteration"
+    newindices=[]
+    sel=-1
+    dmax=0
+    group=[]
+    center=-1
+    neighbours={}
+    density=[0]*len(data)
+    for i in range(0,len(indices)):
+        neighbours[indices[i]]=[]
+    for i in range(0, len(indices)):
+        for j in range(i, len(indices)): #FIXME: This is a massive bottleneck. Creating density and neighbours array could help...
+            if j==i:
+               #print "Apending ", indices[i], "to ",neighbours[indices[i]]
+               neighbours[indices[i]].append(indices[i])
+               density[indices[i]]+=1
+               continue
+            d=scipy.spatial.distance.euclidean(data[indices[i]],data[indices[j]])
+            if d<=dc:
+               #print "distance ", indices[i], "-", indices[j], ": ", d
+               neighbours[indices[i]].append(indices[j])
+               neighbours[indices[j]].append(indices[i])
+               density[indices[i]]+=1
+               density[indices[j]]+=1
+    #print "Neighbours: ", neighbours
+    #print "Density: ", density
+    center=density.index(max(density))
+    #print "Center: ", center
+    group=neighbours[center]
+    if len(group)>0:
+       groups.append(group)
+       centers.append(center)
+    #print "Groups: ", groups
+    for ind in indices:
+       if ind not in group:
+          newindices.append(ind)
+    #print "NewIndices: ", newindices
+    if len(newindices)>0:
+       groups,centers=jcircles(data,groups,newindices,centers,dc)
+
+    return groups,centers
+
 def clustering(time,values,iteration,parameters):
 
-
-    if parameters['clustering']=='jbeans':
+    
+    if parameters['clustering']=='jcircles':
+       #print "entering JCircles function"
+       dc=float(parameters['cluster_dc'])
+       groups=[]
+       centers=[]
+       indices=[]
+       for i in range(0,len(time)):
+           indices.append(i)
+       groups,centers=jcircles(values,groups,indices,centers,dc)
+       clusters={}
+       for i in range(0,len(centers)):
+           t=time[centers[i]]
+           clusters[t]=[]
+           for tj in range(0,len(groups[i])):
+               print 
+               clusters[t].append(time[groups[i][tj]]) 
+       
+    elif parameters['clustering']=='jbeans':
        #Get binning parameters
        max_bins=int(parameters['max_bins'])
        bin_lower=float(parameters['rbins'].split(',')[0])
@@ -1272,15 +1366,17 @@ def save_clusters(parameters,clusters,clustype,iteration):
        cmd='mkdir '+namedir
        os.system(cmd)
        pdbfiles=glob.glob('iter*/*')
-       for time in clusters.keys():
-           time=str(int(float(time)))
-           nameOut=namedir+'/'+clustype+'_'+time+'.pdb'
-           if nameOut in pdbfiles:
-              continue
-           if not os.path.isfile(nameOut): # the time of each center should be the same since we are combining iterations
-              cmd=gmx+' trjconv -f '+trr+' -s '+tpr+' -n '+ndx+' -b '+str(int(time))+' -e '+str(int(time))+\
-                  ' -pbc mol -ur compact -center -o '+nameOut+'<<OUT\n3\n0\n'
-              os.system(cmd)
+       with pymp.Parallel(int(parameters['nthreads'])) as p:
+           for i in p.range(0,len(clusters.keys())):
+               time=clusters.keys()[i]
+               time=str(int(float(time)))
+               nameOut=namedir+'/'+clustype+'_'+time+'.pdb'
+               if nameOut in pdbfiles:
+                  continue
+               if not os.path.isfile(nameOut): # the time of each center should be the same since we are combining iterations
+                  cmd=gmx+' trjconv -f '+trr+' -s '+tpr+' -n '+ndx+' -b '+str(int(time))+' -e '+str(int(time))+\
+                      ' -pbc mol -ur compact -center -o '+nameOut+'<<OUT\n3\n0\n'
+                  os.system(cmd)
            
 
 def generate_restarts(clusters,outliers,iteration,parameters):
@@ -1331,29 +1427,28 @@ def generate_restarts(clusters,outliers,iteration,parameters):
        top=parameters['top']
        mdp=parameters['mdp']
 
-       rep=0
        nameOut="restarts_iteration"+str(iteration+1)+".txt"
+       line_list=[]
        fileout=open(nameOut,'w')
-
-       for instant in times_restarts:
-           time_str=str(int(float(instant)))
-           gro='restart'+str(iteration)+'_'+time_str+'.gro'
-           line="Replica "+str(rep)+" of Iteration "+str(iteration+1)+" will be started from the snapshot at "+time_str+" ps.\n"
-           fileout.write(line)
-           if not os.path.isfile(gro):
-              cmd=gmx+' trjconv -f '+trr+' -s '+tpr+' -n '+ndx+' -b '+str(int(time_str))+' -e '+str(int(time_str))+' -o '+gro+'  <<EOF\n0\n'
-              os.system(cmd)
-           cmd=gmx+' grompp -f '+mdp+' -c '+gro+' -p '+top+' -n '+ndx+' -o '+'iteration'+str(iteration+1)+str(rep)+'.tpr'
-           os.system(cmd)
-           rep=rep+1
+       
+       with pymp.Parallel(int(parameters['nthreads'])) as p:
+           for i in p.range(0,len(times_restarts)):
+               instant=times_restarts[i]
+               time_str=str(int(float(instant)))
+               gro='restart'+str(iteration)+'_'+time_str+'.gro'
+               line_list.append("Replica "+str(i)+" of Iteration "+str(iteration+1)+" will be started from the snapshot at "+time_str+" ps.")
+               if not os.path.isfile(gro):
+                  cmd=gmx+' trjconv -f '+trr+' -s '+tpr+' -n '+ndx+' -b '+str(int(time_str))+' -e '+str(int(time_str))+' -o '+gro+'  <<EOF\n0\n'
+                  os.system(cmd)
+               cmd=gmx+' grompp -f '+mdp+' -c '+gro+' -p '+top+' -n '+ndx+' -o '+'iteration'+str(iteration+1)+str(i)+'.tpr'
+               os.system(cmd)
+       line='\n'.join(line_list)
+       fileout.write(line)
        fileout.close()
        if parameters['debug']==False:
           os.system('rm restart*gro *mdout*')
     
 def calc_avg(iteration,time,clusters,typeclust,cv_arr,metric_arr,metricAvgTarget,metricSDTarget,cvAvgTarget,cvSDTarget):
-    
-    
-
     nameOut='distance_target_'+typeclust+'.'+str(iteration)
     fileout=open(nameOut,'w')
 
@@ -1369,6 +1464,7 @@ def calc_avg(iteration,time,clusters,typeclust,cv_arr,metric_arr,metricAvgTarget
         cv_vals=[]
         dist_vals=[]
         for time_element in clusters[time_center]:
+            print time_element
             index=np.where(time==time_element)[0][0]
             cv_vals.append(cv_arr[index])
             dist=np.linalg.norm(metric_arr[index]-metricAvgTarget)
@@ -1445,23 +1541,35 @@ if __name__ == '__main__':
     max_iter=int(parameters['max_iter'])
    
     crashes={}
+    
+    timefile=open('cluster_time.txt','w')
+    timefile.write("Snaps Time\n")
 
     for iteration in range(st_iter,max_iter):
         if iteration>0:
-           include=build_metric_bias(parameters,clusters,metric_arr,\
+           include,bias_keys=build_metric_bias(parameters,clusters,metric_arr,\
                                      iteration,metric_input,time)
         else:
            include=[]
+           bias_keys=[]
            clusters={}
 
-        taboo_plumedat=gen_plumed_input(parameters,include,clusters)
+        taboo_plumedat=gen_plumed_input(parameters,include,clusters,bias_keys)
         print "Iteration "+str(iteration)+" is going to be submitted."
         crashes=submit_calc(parameters,iteration,crashes)  
         cv_arr,metric_arr,time=combine_trajectories(iteration,parameters,False,cvAvgTarget,metricAvgTarget)
+        start=tiempo.time()
         clusters,outliers=clustering(time,metric_arr,iteration,parameters)
+        end=tiempo.time()
+        elapsed=end-start
+        line=str(len(time))+" "+str(elapsed)+"\n"
+        timefile.write(line)
+        
         save_clusters(parameters,clusters,'cluster',iteration)
         #save_clusters(parameters,outliers,'outlier',iteration)
         if parameters['target'] is not None:
            calc_avg(iteration,time,clusters,'clusters',cv_arr,metric_arr,metricAvgTarget,metricSDTarget,cvAvgTarget,cvSDTarget)
            calc_avg(iteration,time,outliers,'outliers',cv_arr,metric_arr,metricAvgTarget,metricSDTarget,cvAvgTarget,cvSDTarget)
         generate_restarts(clusters,outliers,iteration,parameters)
+
+timefile.close()
