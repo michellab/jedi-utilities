@@ -382,6 +382,16 @@ def getCV(parameters):
        parameters["push_cv_val"]=0
     else:
        parameters["push_cv_stride"]=int(parameters["push_cv_stride"])
+    
+    if 'end_cv' in parameters.keys():
+        print "The value of CV will change for each replica with replica 0 being ", parameters['at_cv'], " and replica N being ", parameters['end_cv'], "."
+        if parameters['end_cv']=="dynamic_up":
+           print "The value of end_cv for each iteration will be the highest one of the iteration before"
+        elif parameters['end_cv']=="dynamic_down":
+           print "The value of end_cv for each iteration will be the lowest one of the iteration before"
+        else:
+           parameters['end_cv']=float(parameters['end_cv'])
+           print "The value of end_cv will be kept at", parameters['end_cv']
        
     
     if cv=='JEDI':
@@ -688,12 +698,12 @@ def analyse_target(parameters,metric_input):
     driver=parameters['plumed_exec']+' driver '+inputflag+parameters['target_extension']+' '+parameters['target']+' --plumed metric_reference.dat'
     os.system(driver)
 
-    time,metric_list_val,cv_list_val,metric_avg,metric_sd,cv_avg,cv_sd=analyse_plumed_output(parameters,'TARGET.colvar',-1)
+    time,metric_list_val,cv_list_val,metric_avg,metric_sd,cv_avg,cv_sd,max_cv,min_cv=analyse_plumed_output(parameters,'TARGET.colvar',-1)
 
     print "Target CV is: "+str(cv_avg)+" +/- "+str(cv_sd)
     print "Target metric is: "+str(metric_avg)+" +/- "+str(metric_sd)
 
-    return metric_avg,metric_sd,cv_avg,cv_sd
+    return metric_avg,metric_sd,cv_avg,cv_sd,max_cv,min_cv
 
 def analyse_plumed_output(parameters, nameIn,iteration):
      
@@ -750,13 +760,15 @@ def analyse_plumed_output(parameters, nameIn,iteration):
 
     cv_avg=np.average(cv_list_val,axis=0)
     cv_sd=np.std(cv_list_val,axis=0)
+    max_cv=np.max(cv_list_val,axis=0)
+    min_cv=np.min(cv_list_val,axis=0)
  
     metric_avg=np.average(metric_list_val,axis=0)
     metric_sd=np.std(metric_list_val,axis=0)      
 
-    return  time, metric_list_val, cv_list_val, metric_avg, metric_sd, cv_avg, cv_sd
+    return  time, metric_list_val, cv_list_val, metric_avg, metric_sd, cv_avg, cv_sd,max_cv,min_cv
 
-def gen_plumed_input(parameters,include,clusters,bias_keys):
+def gen_plumed_input(parameters,include,clusters,bias_keys,max_cv,min_cv):
 
     metric=parameters['metric']
     cv=parameters['cv']
@@ -792,14 +804,24 @@ def gen_plumed_input(parameters,include,clusters,bias_keys):
     
     if parameters['debug']==False and parameters['bias_cv'] is not None:
  #      if bias=="LOWER_WALLS" or bias=="UPPER_WALLS" or bias=="RESTRAINT" or bias=='MOVINGRESTRAINT_L':
+          nsim=int(parameters['nsim'])
           at_cv=float(parameters['at_cv'])+iteration/parameters["push_cv_stride"]*parameters["push_cv_val"]
           kappa_cv=parameters['kappa_cv']
           mts_cv=parameters['mts_cv']
           #at_metric=parameters['at_metric']
           #kappa_metric=parameters['kappa_metric']
           #mts_metric=parameters['mts_metric']
-   
-          line='res_cv: LOWER_WALLS ARG=cv AT='+str(at_cv)+' KAPPA='+str(kappa_cv)+' STRIDE='+str(mts_cv)+'\n'
+          if 'end_cv' not in parameters.keys() or iteration==0: 
+              line='res_cv: LOWER_WALLS ARG=cv AT='+str(at_cv)+' KAPPA='+str(kappa_cv)+' STRIDE='+str(mts_cv)+'\n'
+          elif parameters['end_cv']=='dynamic_up':
+               line='res_cv: LOWER_WALLS ARG=cv AT=mod_cv KAPPA='+str(kappa_cv)+' STRIDE='+str(mts_cv)+'\n'
+               at_cv_vec=np.linspace(at_cv,max_cv,nsim)
+          elif parameters['end_cv']=='dynamic_down':
+               at_cv_vec=np.linspace(min_cv,at_cv,nsim)
+               line='res_cv: LOWER_WALLS ARG=cv AT=mod_cv KAPPA='+str(kappa_cv)+' STRIDE='+str(mts_cv)+'\n'
+          else:
+               at_cv_vec=np.linspace(at_cv,end_cv,nsim)
+               line='res_cv: LOWER_WALLS ARG=cv AT=mod_cv KAPPA='+str(kappa_cv)+' STRIDE='+str(mts_cv)+'\n'
           fileout.write(line)
 
     for center in clusters.keys():
@@ -837,6 +859,16 @@ def gen_plumed_input(parameters,include,clusters,bias_keys):
     line='PRINT ARG=cv,'+','.join(metric_lab)+' STRIDE='+stride+' FILE=COLVAR\n'
     fileout.write(line)
     fileout.close()
+    if 'end_cv' not in parameters.keys() or iteration==0:
+        pass
+    else:
+        for i in range(0,nsim):
+            cmd='cp taboo_bias.dat taboo_bias.'+str(i)+'.dat'
+            os.system(cmd)
+            cmd='sed -i "s/mod_cv/'+str(at_cv_vec[i])+'/g" taboo_bias.'+str(i)+'.dat'
+            os.system(cmd)
+            cmd='sed -i "s/FILE=COLVAR/FILE=COLVAR.'+str(i)+'/g" taboo_bias.'+str(i)+'.dat'
+            os.system(cmd)
 
 def build_metric_bias(parameters,clusters,metric_arr,iteration,metric_input,time):
 
@@ -956,21 +988,32 @@ def submit_calc(parameters,iteration,crashes):
       line=line+'cd $PBS_O_WORKDIR\n'
 
     if parameters['md_engine']=='GROMACS':
-       if iteration==0:
+       if 'end_cv' not in parameters.keys() or iteration==0:
+          if iteration==0:
+             for i in range(0,int(parameters['nsim'])):
+                cmd='cp '+parameters['tpr']+' iteration0'+str(i)+'.tpr'
+                os.system(cmd)
+          deffnm='iteration'+str(iteration)
+          line=parameters['mpi_exec']+' -n '+str(parameters['nsim'])+' '+\
+               parameters['gmx_path']+' mdrun -v -ntomp '+str(parameters['ntomp'])+\
+               ' -deffnm '+deffnm+' -nsteps '+parameters['nsteps']+' -plumed taboo_bias.dat -multi '+str(parameters['nsim'])+'\n'
+          fileout.write(line)
+       else:
           for i in range(0,int(parameters['nsim'])):
-             cmd='cp '+parameters['tpr']+' iteration0'+str(i)+'.tpr'
-             os.system(cmd)
-       deffnm='iteration'+str(iteration)
-       line=parameters['mpi_exec']+' -n '+str(parameters['nsim'])+' '+\
-            parameters['gmx_path']+' mdrun -v -ntomp '+str(parameters['ntomp'])+\
-            ' -deffnm '+deffnm+' -nsteps '+parameters['nsteps']+' -plumed taboo_bias.dat -multi '+str(parameters['nsim'])+'\n'
-       fileout.write(line)
+              deffnm='iteration'+str(iteration)
+              line=parameters['mpi_exec']+' -n 1 '+\
+                   parameters['gmx_path']+' mdrun -v -ntomp '+str(parameters['ntomp'])+\
+                   ' -deffnm '+deffnm+str(i)+' -nsteps '+parameters['nsteps']+' -plumed taboo_bias.'+str(i)+'.dat &\n'
+              fileout.write(line)
+          line='wait\n'
+          fileout.write(line)
 
        gettime=tiempo.strftime("%c")
        name_time=gettime.split()[2]+gettime.split()[1]+gettime.split()[4]+'_'+gettime.split()[3].replace(':','_')
        line='touch '+name_time # This is just to check whether the calculation finished or not
        fileout.write(line)
     fileout.close()
+    #sys.exit()
 
     # Sumbitting the job
     if q_system=='slurm':
@@ -1049,7 +1092,7 @@ def combine_trajectories(iteration,parameters,restart,cvAvgTarget,metricAvgTarge
         cmd='mv '+txt+' iteration'+str(iteration)+'_'+txt+'.txt'
         os.system(cmd)
     
-    time,metric_list_val,cv_list_val,metric_avg,metric_sd,cv_avg,cv_sd=analyse_plumed_output(parameters,'COLVAR',iteration)
+    time,metric_list_val,cv_list_val,metric_avg,metric_sd,cv_avg,cv_sd,max_cv,min_cv=analyse_plumed_output(parameters,'COLVAR',iteration)
     
     if (cvAvgTarget is not None) and (metricAvgTarget is not None):
        fileout=open('distance_target.txt','w')
@@ -1066,7 +1109,7 @@ def combine_trajectories(iteration,parameters,restart,cvAvgTarget,metricAvgTarge
         
         
    
-    return cv_list_val, metric_list_val,time
+    return cv_list_val, metric_list_val,time,max_cv,min_cv
 
 #FIXME: This function is out of the clustering function because it is recursive. Someone think of a way to put it in
 def jcircles(data,groups,indices,centers,dc):
@@ -1508,16 +1551,16 @@ if __name__ == '__main__':
     metric_input=setupMetric(parameters) # Get the necessary parameters for the metric of use
 
     if parameters['target'] is not None:
-       metricAvgTarget,metricSDTarget,cvAvgTarget,cvSDTarget=analyse_target(parameters,metric_input)
+       metricAvgTarget,metricSDTarget,cvAvgTarget,cvSDTarget,max_cv,min_cv=analyse_target(parameters,metric_input)
     else:
-       metricAvgTarget,metricSDTarget,cvAvgTarget,cvSDTarget=None,None,None,None
+       metricAvgTarget,metricSDTarget,cvAvgTarget,cvSDTarget=None,None,None,None,None,None
     
     ##### RESTART CALCULATION IF NECESSARY ###################
     st_iter=int(parameters['st_iter'])
     if st_iter>0:
 #       print "The restarting function is not complete yet. Exiting."
 #       sys.exit()
-       cv_arr,metric_arr,time=combine_trajectories(st_iter-1,parameters,True,cvAvgTarget,metricAvgTarget) 
+       cv_arr,metric_arr,time,max_cv,min_cv=combine_trajectories(st_iter-1,parameters,True,cvAvgTarget,metricAvgTarget) 
        clusters,outliers=clustering(time,metric_arr,st_iter-1,parameters)
        save_clusters(parameters,clusters,'cluster',st_iter-1)
        #save_clusters(parameters,outliers,'outlier',st_iter-1)
@@ -1554,10 +1597,10 @@ if __name__ == '__main__':
            bias_keys=[]
            clusters={}
 
-        taboo_plumedat=gen_plumed_input(parameters,include,clusters,bias_keys)
+        taboo_plumedat=gen_plumed_input(parameters,include,clusters,bias_keys,max_cv,min_cv)
         print "Iteration "+str(iteration)+" is going to be submitted."
         crashes=submit_calc(parameters,iteration,crashes)  
-        cv_arr,metric_arr,time=combine_trajectories(iteration,parameters,False,cvAvgTarget,metricAvgTarget)
+        cv_arr,metric_arr,time,max_cv,min_cv=combine_trajectories(iteration,parameters,False,cvAvgTarget,metricAvgTarget)
         start=tiempo.time()
         clusters,outliers=clustering(time,metric_arr,iteration,parameters)
         end=tiempo.time()
