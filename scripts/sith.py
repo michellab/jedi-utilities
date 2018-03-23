@@ -869,6 +869,8 @@ def gen_plumed_input(parameters,include,clusters,bias_keys,max_cv,min_cv):
             os.system(cmd)
             cmd='sed -i "s/FILE=COLVAR/FILE=COLVAR.'+str(i)+'/g" taboo_bias.'+str(i)+'.dat'
             os.system(cmd)
+            cmd='sed -i "s/FILE=total_bias/FILE=total_bias.'+str(i)+'/g" taboo_bias.'+str(i)+'.dat'
+            os.system(cmd)
 
 def build_metric_bias(parameters,clusters,metric_arr,iteration,metric_input,time):
 
@@ -1112,7 +1114,7 @@ def combine_trajectories(iteration,parameters,restart,cvAvgTarget,metricAvgTarge
     return cv_list_val, metric_list_val,time,max_cv,min_cv
 
 #FIXME: This function is out of the clustering function because it is recursive. Someone think of a way to put it in
-def jcircles(data,groups,indices,centers,dc):
+def jcircles(data,groups,indices,centers,dc,nthreads):
     #print "new iteration"
     newindices=[]
     sel=-1
@@ -1123,20 +1125,21 @@ def jcircles(data,groups,indices,centers,dc):
     density=[0]*len(data)
     for i in range(0,len(indices)):
         neighbours[indices[i]]=[]
-    for i in range(0, len(indices)):
-        for j in range(i, len(indices)): #FIXME: This is a massive bottleneck. Creating density and neighbours array could help...
-            if j==i:
-               #print "Apending ", indices[i], "to ",neighbours[indices[i]]
-               neighbours[indices[i]].append(indices[i])
-               density[indices[i]]+=1
-               continue
-            d=scipy.spatial.distance.euclidean(data[indices[i]],data[indices[j]])
-            if d<=dc:
-               #print "distance ", indices[i], "-", indices[j], ": ", d
-               neighbours[indices[i]].append(indices[j])
-               neighbours[indices[j]].append(indices[i])
-               density[indices[i]]+=1
-               density[indices[j]]+=1
+    with pymp.Parallel(nthreads) as p:
+        for i in p.range(0, len(indices)):
+            for j in range(i, len(indices)): #FIXME: This is a massive bottleneck. Creating density and neighbours array could help...
+                if j==i:
+                   #print "Apending ", indices[i], "to ",neighbours[indices[i]]
+                   neighbours[indices[i]].append(indices[i])
+                   density[indices[i]]+=1
+                   continue
+                d=scipy.spatial.distance.euclidean(data[indices[i]],data[indices[j]])
+                if d<=dc:
+                   #print "distance ", indices[i], "-", indices[j], ": ", d
+                   neighbours[indices[i]].append(indices[j])
+                   neighbours[indices[j]].append(indices[i])
+                   density[indices[i]]+=1
+                   density[indices[j]]+=1
     #print "Neighbours: ", neighbours
     #print "Density: ", density
     center=density.index(max(density))
@@ -1151,28 +1154,27 @@ def jcircles(data,groups,indices,centers,dc):
           newindices.append(ind)
     #print "NewIndices: ", newindices
     if len(newindices)>0:
-       groups,centers=jcircles(data,groups,newindices,centers,dc)
+       groups,centers=jcircles(data,groups,newindices,centers,dc,nthreads)
 
     return groups,centers
 
 def clustering(time,values,iteration,parameters):
 
-    
+    nthreads=int(parameters['nthreads'])
     if parameters['clustering']=='jcircles':
-       #print "entering JCircles function"
+       print "entering JCircles function"
        dc=float(parameters['cluster_dc'])
        groups=[]
        centers=[]
        indices=[]
        for i in range(0,len(time)):
            indices.append(i)
-       groups,centers=jcircles(values,groups,indices,centers,dc)
+       groups,centers=jcircles(values,groups,indices,centers,dc,nthreads)
        clusters={}
        for i in range(0,len(centers)):
            t=time[centers[i]]
            clusters[t]=[]
            for tj in range(0,len(groups[i])):
-               print 
                clusters[t].append(time[groups[i][tj]]) 
        
     elif parameters['clustering']=='jbeans':
@@ -1399,7 +1401,6 @@ def clustering(time,values,iteration,parameters):
 
 
 def save_clusters(parameters,clusters,clustype,iteration):
-    #FIXME: This is really slow. There must be a way to run several of them at the same time
     if parameters['md_engine']=='GROMACS':
        trr='totaltraj.trr'
        tpr=parameters['tpr']
@@ -1558,8 +1559,12 @@ if __name__ == '__main__':
     ##### RESTART CALCULATION IF NECESSARY ###################
     st_iter=int(parameters['st_iter'])
     if st_iter>0:
-#       print "The restarting function is not complete yet. Exiting."
-#       sys.exit()
+       if not os.path.isfile('cluster_time.bckp'):
+          cmd='mv cluster_time.txt cluster_time.bckp'
+       else:
+          cmd='cat cluster_time.txt >> cluster_time.bckp'
+       os.system(cmd)
+       #FIXME: Depending on where the program crashes, the COLVAR file ends up being shorter or longer than it should
        cv_arr,metric_arr,time,max_cv,min_cv=combine_trajectories(st_iter-1,parameters,True,cvAvgTarget,metricAvgTarget) 
        clusters,outliers=clustering(time,metric_arr,st_iter-1,parameters)
        save_clusters(parameters,clusters,'cluster',st_iter-1)
@@ -1592,6 +1597,7 @@ if __name__ == '__main__':
         if iteration>0:
            include,bias_keys=build_metric_bias(parameters,clusters,metric_arr,\
                                      iteration,metric_input,time)
+           print "Clustering took ", elapsed, " seconds for the last iteration"
         else:
            include=[]
            bias_keys=[]
