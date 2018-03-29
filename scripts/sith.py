@@ -448,8 +448,8 @@ def getCV(parameters):
 # Check that the metric is supported and it works wit the CV.
 def getMetric(parameters):
 
-    supported_metrics=['SC_TORSION']
-    supported_cvs_metric={'SC_TORSION':['JEDI']}
+    supported_metrics=['SC_TORSION','BB_TORSION']
+    supported_cvs_metric={'SC_TORSION':['JEDI'], 'BB_TORSION':['JEDI']}
     
     if 'metric' not in parameters.keys():
        print "ERROR: The metric that drives the taboo search must be defined with the option 'metric='. Exiting."
@@ -650,6 +650,143 @@ def setupMetric(parameters):
        print "This is a total of "+str(2*len(chi.keys()))+" variables"
        return chi
 
+########################
+    if metric=='BB_TORSION': #FIXME: need to specify that it has to be pdb and raise an error if it's not
+       if 'reference_structure' not in parameters.keys():
+          print "ERROR: you need to provide a reference structure to measure side chain torsions."
+          print "Use option 'reference_structure=' to provide a file. Exiting."
+          sys.exit()
+       elif not os.path.isfile(parameters['reference_structure']):
+          print "ERROR: file '"+parameters['reference_structure']+"' not found. Exiting."
+          sys.exit()
+       else:
+          structure=parameters['reference_structure']
+
+       torsion_specs=['BB_list','TOR_list']
+       for spec in torsion_specs:
+           atLeastOne=False
+           if spec not in parameters.keys():
+              parameters[spec]=None
+           else:
+              atLeastOne=True
+       if atLeastOne==False: 
+          if cv=='JEDI' and os.path.isfile(parameters['apolar']) and os.path.isfile(parameters['polar']):
+             pass
+          else:
+              print "You need to specify how the torsions will be chosen (whole SC (SC_list) or just some TOR (TOR_list)). eXITING."
+              sys.exit()
+       if parameters['BB_list'] is not None:
+          residues_str=parameters['BB_list'].split(',')
+       elif parameters['TOR_list'] is not None:
+          torsions={}
+          residues_str=[]
+          for residue in parameters['TOR_list'].split(','):
+              res=residue.split(':')[0]
+              residues_str.append(res)
+              torsions[res]=[]
+              for torsion in residue.split(':')[1].split(';'):
+                  torsions[res].append(torsion)
+          print residues_str
+          print torsions
+          #sys.exit()
+       elif cv=='JEDI':
+          apolar=parameters['apolar']
+          polar=parameters['polar']
+
+          residues_str=[]
+          residues=[]
+          for pdb in [apolar,polar]:
+              site=mdtraj.load_pdb(pdb)
+              for res in site.topology.residues:
+                  if str(res) not in residues_str and "GLY" not in str(res):
+                     residues_str.append(str(res))
+                     residues.append(res)
+
+       print "The residues that are going to be taken into account are:"
+       print residues_str
+       print "There are", len(residues_str), "residues in the defined binding site (which could be the whole protein!)"
+
+       struct=mdtraj.load_pdb(structure)
+       atoms_system=[]
+       for atom in struct.topology.atoms:
+           atoms_system.append(str(atom))
+
+       phi_psi={}
+
+       add=False
+       for i in range(0,len(mdtraj.compute_phi(struct)[0])):
+           atoms=[]
+           for atom in mdtraj.compute_phi(struct)[0][i]:
+               res_atom=atoms_system[atom].split('-')[0]
+               if res_atom in residues_str:
+                  add=True
+                  break
+           if add==True:
+              for atom in mdtraj.compute_phi(struct)[0][i]:
+                  atoms.append(str(atom+1))
+           if len(atoms)==4:
+              name='phi_'+res_atom
+              phi_psi[name]=atoms
+           elif len(atoms)!=0:
+              print atoms
+              print "something went wrong when assigning dihedrals. A dihedral can't have a number of atoms different than 4"
+              sys.exit() 
+           add=False
+    
+
+       for i in range(0,len(mdtraj.compute_psi(struct)[0])):
+           atoms=[]
+           for atom in mdtraj.compute_psi(struct)[0][i]:
+               res_atom=atoms_system[atom].split('-')[0]
+               if res_atom in residues_str:
+                  add=True
+                  break
+           if add==True:
+              for atom in mdtraj.compute_psi(struct)[0][i]:
+                  atoms.append(str(atom+1))
+           if len(atoms)==4:
+              name='psi_'+res_atom
+              phi_psi[name]=atoms
+           elif len(atoms)!=0:
+              print atoms
+              print "something went wrong when assigning dihedrals. A dihedral can't have a number of atoms different than 4"
+              sys.exit() 
+           add=False
+
+       for i in range(0,len(mdtraj.compute_omega(struct)[0])):
+           atoms=[]
+           for atom in mdtraj.compute_omega(struct)[0][i]:
+               res_atom=atoms_system[atom].split('-')[0]
+               if res_atom in residues_str:
+                  add=True
+                  break
+           if add==True:
+              for atom in mdtraj.compute_omega(struct)[0][i]:
+                  atoms.append(str(atom+1))
+           if len(atoms)==4:
+              name='omega_'+res_atom
+              phi_psi[name]=atoms
+           elif len(atoms)!=0:
+              print atoms
+              print "something went wrong when assigning dihedrals. A dihedral can't have a number of atoms different than 4"
+              sys.exit()
+           add=False
+       
+       fileout=open('metric.dat','w')
+       for key in phi_psi.keys():
+           line=key+': TORSION ATOMS='+','.join(phi_psi[key])+'\n'
+           fileout.write(line)
+           line='sin_'+key+': MATHEVAL ARG='+key+' FUNC=sin(x) PERIODIC=NO'+'\n'
+           fileout.write(line)
+           line='cos_'+key+': MATHEVAL ARG='+key+' FUNC=cos(x) PERIODIC=NO'+'\n'
+           fileout.write(line)
+       fileout.close()
+       print "The sines and cosines of "+str(len(phi_psi.keys()))+ " torsions are going to be used as a metric."
+       print "This is a total of "+str(2*len(phi_psi.keys()))+" variables"
+       return phi_psi
+
+
+########################
           
 def analyse_target(parameters,metric_input):
     
@@ -678,7 +815,7 @@ def analyse_target(parameters,metric_input):
        line=line+'\n'
        fileout.write(line)
 
-    if metric=='SC_TORSION':
+    if metric=='SC_TORSION' or metric=="BB_TORSION":
        metric_lab=[]
        for key in metric_input.keys():
            sin='sin_'+key
