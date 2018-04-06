@@ -37,7 +37,7 @@ for pdb in $(ls -d */); do
 
     cd complex
      bash ../../../../../scripts/gmx5_setup.sh complex
-     if [ ! -f complex_ions.gro ]; then exit; fi
+     if [ ! -f complex_ions.gro ]; then continue; fi
      gmx editconf -f complex_ions.gro -o complex_ions.pdb
      grep 'LIG' complex_ions.pdb > ligand_centered.pdb
      python ../../../../../scripts/jedi-setup.py -i complex_ions.pdb -l ligand_centered.pdb -ln LIG -c 0.6 -s 0.15 # the atom indices change from pdb to gro so we have to do it again
@@ -45,72 +45,72 @@ for pdb in $(ls -d */); do
      cp apolar.pdb polar.pdb grid.pdb ../apoDry
      gmx grompp -f ../../../../../mdp/em_10000_sd.mdp -c complex_ions.gro -p complex.top -o complex_em_sd.tpr
      gmx mdrun -v -deffnm complex_em_sd -plumed jedi_monitor.dat -nsteps 10000
-     if [ ! -f complex_em_sd.gro ]; then exit; fi
+     if [ ! -f complex_em_sd.gro ]; then continue; fi
      mv COLVAR sd_COLVAR
      gmx grompp -f ../../../../../mdp/em_10000_cg.mdp -c complex_em_sd.gro -p complex.top -o complex_em_cg.tpr
      gmx mdrun -v -deffnm complex_em_cg -plumed jedi_monitor.dat -nsteps 10000
-     if [ ! -f complex_em_cg.gro ]; then exit; fi
+     if [ ! -f complex_em_cg.gro ]; then continue; fi
      mv COLVAR cg_COLVAR
      gmx grompp -f ../../../../../mdp/nvt.mdp -c complex_em_cg.gro -p complex.top -o complex_nvt.tpr
      gmx mdrun -v -deffnm complex_nvt -nsteps 100000 -plumed jedi_monitor.dat
-     if [ ! -f complex_nvt.gro ]; then exit; fi
+     if [ ! -f complex_nvt.gro ]; then continue; fi
      mv COLVAR nvt_COLVAR
      gmx grompp -f ../../../../../mdp/nvt.mdp -c complex_nvt.gro -p complex.top -o complex_npt.tpr
      gmx mdrun -v -deffnm complex_npt -nsteps 100000 -plumed jedi_monitor.dat
-     if [ ! -f complex_npt.gro ]; then exit; fi
+     if [ ! -f complex_npt.gro ]; then continue; fi
      mv COLVAR npt_COLVAR
      gmx grompp -f ../../../../../mdp/md.mdp -c complex_npt.gro -p complex.top -o complex_md.tpr
      gmx mdrun -v -deffnm complex_md -nsteps 25000000 -plumed jedi_monitor.dat
-     if [ ! -f complex_md.gro ]; then exit; fi
+     if [ ! -f complex_md.gro ]; then continue; fi
     cd ..
 
     cd apoWet
      bash ../../../../../scripts/gmx5_setup.sh apoWet
-     if [ ! -f apoWet_ions.gro ]; then exit; fi
+     if [ ! -f apoWet_ions.gro ]; then continue; fi
      gmx grompp -f ../../../../../mdp/em_10000_sd.mdp -c apoWet_ions.gro -p apoWet.top -o apoWet_em_sd.tpr
      gmx mdrun -v -deffnm apoWet_em_sd -plumed jedi_monitor.dat -nsteps 10000
-     if [ ! -f apoWet_em_sd.gro ]; then exit; fi
+     if [ ! -f apoWet_em_sd.gro ]; then continue; fi
      mv COLVAR sd_COLVAR
      gmx grompp -f ../../../../../mdp/em_10000_cg.mdp -c apoWet_em_sd.gro -p apoWet.top -o apoWet_em_cg.tpr
      gmx mdrun -v -deffnm apoWet_em_cg -plumed jedi_monitor.dat -nsteps 10000
-     if [ ! -f apoWet_em_cg.gro ]; then exit; fi
+     if [ ! -f apoWet_em_cg.gro ]; then continue; fi
      mv COLVAR cg_COLVAR
      gmx grompp -f ../../../../../mdp/nvt.mdp -c apoWet_em_cg.gro -p apoWet.top -o apoWet_nvt.tpr
      gmx mdrun -v -deffnm apoWet_nvt -nsteps 100000 -plumed jedi_monitor.dat
-     if [ ! -f apoWet_nvt.gro ]; then exit; fi
+     if [ ! -f apoWet_nvt.gro ]; then continue; fi
      mv COLVAR nvt_COLVAR
      gmx grompp -f ../../../../../mdp/nvt.mdp -c apoWet_nvt.gro -p apoWet.top -o apoWet_npt.tpr
      gmx mdrun -v -deffnm apoWet_npt -nsteps 100000 -plumed jedi_monitor.dat
-     if [ ! -f apoWet_npt.gro ]; then exit; fi
+     if [ ! -f apoWet_npt.gro ]; then continue; fi
      mv COLVAR npt_COLVAR
      gmx grompp -f ../../../../../mdp/md.mdp -c apoWet_npt.gro -p apoWet.top -o apoWet_md.tpr
      gmx mdrun -v -deffnm apoWet_md -nsteps 25000000 -plumed jedi_monitor.dat
-     if [ ! -f apoWet_md.gro ]; then exit; fi
+     if [ ! -f apoWet_md.gro ]; then continue; fi
 
    cd ..
 skip
    cd apoDry
      bash ../../../../../scripts/gmx5_setup.sh apoDry
-     if [ ! -f apoDry_ions.gro ]; then exit; fi
+     if [ ! -f apoDry_ions.gro ]; then continue; fi
      gmx grompp -f ../../../../../mdp/em_10000_sd.mdp -c apoDry_ions.gro -p apoDry.top -o apoDry_em_sd.tpr
      gmx mdrun -v -deffnm apoDry_em_sd -plumed jedi_monitor.dat -nsteps 10000
-     if [ ! -f apoDry_em_sd.gro ]; then exit; fi
+     if [ ! -f apoDry_em_sd.gro ]; then continue; fi
      mv COLVAR sd_COLVAR
      gmx grompp -f ../../../../../mdp/em_10000_cg.mdp -c apoDry_em_sd.gro -p apoDry.top -o apoDry_em_cg.tpr
      gmx mdrun -v -deffnm apoDry_em_cg -plumed jedi_monitor.dat -nsteps 10000
-     if [ ! -f apoDry_em_cg.gro ]; then exit; fi
+     if [ ! -f apoDry_em_cg.gro ]; then continue; fi
      mv COLVAR cg_COLVAR
      gmx grompp -f ../../../../../mdp/nvt.mdp -c apoDry_em_cg.gro -p apoDry.top -o apoDry_nvt.tpr
      gmx mdrun -v -deffnm apoDry_nvt -nsteps 100000 -plumed jedi_monitor.dat
-     if [ ! -f apoDry_nvt.gro ]; then exit; fi
+     if [ ! -f apoDry_nvt.gro ]; then continue; fi
      mv COLVAR nvt_COLVAR
      gmx grompp -f ../../../../../mdp/nvt.mdp -c apoDry_nvt.gro -p apoDry.top -o apoDry_npt.tpr
      gmx mdrun -v -deffnm apoDry_npt -nsteps 100000 -plumed jedi_monitor.dat
-     if [ ! -f apoDry_npt.gro ]; then exit; fi
+     if [ ! -f apoDry_npt.gro ]; then continue; fi
      mv COLVAR npt_COLVAR
      gmx grompp -f ../../../../../mdp/md.mdp -c apoDry_npt.gro -p apoDry.top -o apoDry_md.tpr
      gmx mdrun -v -deffnm apoDry_md -nsteps 25000000 -plumed jedi_monitor.dat
-     if [ ! -f apoDry_md.gro ]; then exit; fi
+     if [ ! -f apoDry_md.gro ]; then continue; fi
    cd ..
 
 done
