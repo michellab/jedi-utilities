@@ -1,5 +1,0 @@
-; to test
-; grompp -f em.mdp -c LIG1_GMX.gro -p LIG1_GMX.top -o em.tpr -v
-; mdrun -v -deffnm em
-integrator               = steep
-nsteps                   = 500
