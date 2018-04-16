@@ -1,6 +1,18 @@
 import argparse, os,sys, copy, math
 import mdtraj, numpy, gromacs
 
+def merge_molecules(bonds):
+    out=[bonds[0].tolist()]
+    for bond in bonds:
+        blist=bond.tolist()
+        for o in out:
+            if set(blist).intersection(set(o)):
+                o[:] = list(set(blist)) + list(set(o))
+                break
+            else:
+                out.append(blist)
+    return out 
+
 def split_pdb(frame,lignames,cofnames):
     '''
     Separate the structure frame of the complex
@@ -13,6 +25,36 @@ def split_pdb(frame,lignames,cofnames):
     cofactors_list={}
 
     top=frame.topology
+    
+    
+    # Find separate molecules
+    table,bonds=top.to_dataframe()
+    '''
+    molecules={0:[bonds[0][0],bonds[0][1]]}
+    key_init=0
+    for bond in bonds[1:]:
+        new_molecule=True
+        for key in molecules.keys():
+            if bond[0] in molecules[key] and bond[1] not in molecules[key]:
+               molecules[key].append(bond[1])
+               new_molecule=False
+               break
+            elif bond[0] not in molecules[key] and bond[1] in molecules[key]:
+               molecules[key].append(bond[0])
+               new_molecule=False
+               break
+            elif bond[0] in molecules[key] and bond[1] in molecules[key]:
+               new_molecule=False
+               break
+        if new_molecule==False:
+           continue
+        else:
+           key_init=key_init+1
+           molecules[key_init]=[bond[0],bond[1]]
+    '''
+    molecules=merge_molecules(bonds)
+    print molecules
+    sys.exit()
 
     # Separate atoms in protein, cofactor, ligand, water
     for i in range(0,frame.n_atoms):
@@ -23,13 +65,16 @@ def split_pdb(frame,lignames,cofnames):
            #FIXME This is going to put ligands that have same residue 
            #FIXME name and residue number (ligands in different chains 
            #FIXME of a dimer, for instance) in the same pdb file.
+           #nameres=str(top.atom(i).residue)+str(top.atom(i).chain)
+           #print nameres
+           #sys.exit()
            if str(top.atom(i).residue) not in ligands_list.keys(): 
               ligands_list[str(top.atom(i).residue)]=[i]
            else:
               ligands_list[str(top.atom(i).residue)].append(i)
-
+           
         elif str(top.atom(i).residue)[0:3] in cofnames:
-           if str(top.atom(i).residue)[3:] not in ligands_list.keys():
+           if str(top.atom(i).residue) not in cofactors_list.keys():
               cofactors_list[str(top.atom(i).residue)]=[i]
            else:
               cofactors_list[str(top.atom(i).residue)].append(i)
@@ -81,14 +126,71 @@ def ligand_topologies(small_molec):
            print "Something went wrong with acpype. Exiting."
            sys.exit()
 
+def find_oxygens(ligand):
+    oxygen_coordinates=[]
+    top_oxygen=mdtraj.Topology()
+    chain=top_oxygen.add_chain()
+    oxygen = mdtraj.element.oxygen
+    top=ligand.topology
+    for i in range(0,ligand.n_atoms):
+        if top.atom(i).element==mdtraj.element.oxygen:
+           residue = top_oxygen.add_residue("HOH",chain)
+           top_oxygen.add_atom("O",oxygen,residue)
+           oxygen_coordinates.append(ligand.xyz[0][i])
+    xyz=numpy.array(oxygen_coordinates)
+    oxygens=mdtraj.Trajectory(xyz,top_oxygen)
+    oxygens.save("original_oxy.pdb")
+    n_atoms=oxygens.n_atoms
+    return oxygens,oxygen_coordinates,top_oxygen
+
+def add_oxygens(ligand,oxygens,oxygen_coordinates,top_oxygen):
+    noreplace=[]
+    oxygen = mdtraj.element.oxygen
+    chain=top_oxygen.add_chain()
+    top=ligand.topology
+    for i in range(0,ligand.n_atoms):
+        if top.atom(i).element==mdtraj.element.oxygen:
+           print "Found an old oxygen. Skipping"
+           continue
+        else:
+           i_coords=ligand.xyz[0][i]
+           for j in range(0,oxygens.n_atoms):
+               j_coords=oxygens.xyz[0][j]
+               dist2=((j_coords[0]-i_coords[0])**2+(j_coords[1]-i_coords[1])**2+(j_coords[2]-i_coords[2])**2)
+               if dist2 < 0.0729:
+                  noreplace.append(i)
+                  break
+           if i not in noreplace:
+               residue = top_oxygen.add_residue("HOH",chain)
+               top_oxygen.add_atom("O",oxygen,residue)
+               oxygen_coordinates.append(ligand.xyz[0][i])
+               xyz=numpy.array(oxygen_coordinates)
+               oxygens=mdtraj.Trajectory(xyz,top_oxygen)
+               oxygens=add_oxygens(ligand,oxygens,oxygen_coordinates,top_oxygen)
+
+    return oxygens
+
+def output_oxygens(oxygens,name):
+    savename='HOH_'+name+'.pdb'
+    oxygens.save(savename)
+    return 0
+
+
 
 if __name__=='__main__':
      
-     frame=mdtraj.load_pdb('complex_clean.pdb')
+     frame=mdtraj.load_pdb('../input/1qzr.pdb')
      lignames=['CDX']
-     cofnames=['ANP'] 
+     cofnames=['ANP','MG'] 
      small_molec=split_pdb(frame,lignames,cofnames)
      ligand_topologies(small_molec)
+     for name in small_molec:
+         if name[0:3] in lignames:
+            ligname=name+'.pdb'
+            ligand=mdtraj.load_pdb(ligname)
+            oxygens,oxygen_coordinates,top_oxygen=find_oxygens(ligand)
+            oxygens=add_oxygens(ligand,oxygens,oxygen_coordinates,top_oxygen)
+            z=output_oxygens(oxygens,name)
 
 
 

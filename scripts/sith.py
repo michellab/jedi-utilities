@@ -543,7 +543,7 @@ def setupMetric(parameters):
               parameters[spec]=None
            else:
               atLeastOne=True
-       if atLeastOne==False:
+       if (atLeastOne==False and cv is not 'JEDI') or (not os.path.isfile(parameters['apolar']) or not os.path.isfile(parameters['polar'])):
           print "You need to specify how the torsions will be chosen (whole SC (SC_list) or just some TOR (TOR_list)). eXITING."
           sys.exit()
        if parameters['SC_list'] is not None:
@@ -1566,7 +1566,10 @@ if __name__ == '__main__':
        os.system(cmd)
        #FIXME: Depending on where the program crashes, the COLVAR file ends up being shorter or longer than it should
        cv_arr,metric_arr,time,max_cv,min_cv=combine_trajectories(st_iter-1,parameters,True,cvAvgTarget,metricAvgTarget) 
+       start=tiempo.time()
        clusters,outliers=clustering(time,metric_arr,st_iter-1,parameters)
+       end=tiempo.time()
+       elapsed=end-start
        save_clusters(parameters,clusters,'cluster',st_iter-1)
        #save_clusters(parameters,outliers,'outlier',st_iter-1)
        generate_restarts(clusters,outliers,st_iter-1,parameters)

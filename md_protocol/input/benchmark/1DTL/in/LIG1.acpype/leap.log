@@ -1,0 +1,150 @@
+log started: Fri Apr  6 17:16:06 2018
+
+Log file: ./leap.log
+>> #
+>> # ----- leaprc for loading the general Amber Force field.
+>> #       This file is mostly for use with Antechamber
+>> #
+>> #	load atom type hybridizations
+>> #
+>> addAtomTypes {
+>> 	{ "h1"  "H" "sp3" }
+>> 	{ "h2"  "H" "sp3" }
+>> 	{ "h3"  "H" "sp3" }
+>> 	{ "h4"  "H" "sp3" }
+>> 	{ "h5"  "H" "sp3" }
+>> 	{ "ha"  "H" "sp3" }
+>> 	{ "hc"  "H" "sp3" }
+>> 	{ "hn"  "H" "sp3" }
+>> 	{ "ho"  "H" "sp3" }
+>> 	{ "hp"  "H" "sp3" }
+>> 	{ "hs"  "H" "sp3" }
+>> 	{ "hw"  "H" "sp3" }
+>> 	{ "hx"  "H" "sp3" }
+>> 	{ "o"  "O" "sp2" }
+>> 	{ "o2"  "O" "sp2" }
+>> 	{ "oh"  "O" "sp3" }
+>> 	{ "os"  "O" "sp3" }
+>> 	{ "ow"  "O" "sp3" }
+>> 	{ "c"  "C" "sp2" }
+>> 	{ "c1"  "C" "sp2" }
+>> 	{ "c2"  "C" "sp2" }
+>> 	{ "c3"  "C" "sp3" }
+>> 	{ "ca"  "C" "sp2" }
+>> 	{ "cc"  "C" "sp2" }
+>> 	{ "cd"  "C" "sp2" }
+>> 	{ "ce"  "C" "sp2" }
+>> 	{ "cf"  "C" "sp2" }
+>> 	{ "cg"  "C" "sp2" }
+>> 	{ "ch"  "C" "sp2" }
+>> 	{ "cp"  "C" "sp2" }
+>> 	{ "cq"  "C" "sp2" }
+>> 	{ "cu"  "C" "sp2" }
+>> 	{ "cv"  "C" "sp2" }
+>> 	{ "cx"  "C" "sp2" }
+>> 	{ "cy"  "C" "sp2" }
+>> 	{ "cz"  "C" "sp2" }
+>> 	{ "n"   "N" "sp2" }
+>> 	{ "n1"  "N" "sp2" }
+>> 	{ "n2"  "N" "sp2" }
+>> 	{ "n3"  "N" "sp3" }
+>> 	{ "n4"  "N" "sp3" }
+>> 	{ "na"  "N" "sp2" }
+>> 	{ "nb"  "N" "sp2" }
+>> 	{ "nc"  "N" "sp2" }
+>> 	{ "nd"  "N" "sp2" }
+>> 	{ "ne"  "N" "sp2" }
+>> 	{ "nf"  "N" "sp2" }
+>> 	{ "nh"  "N" "sp2" }
+>> 	{ "no"  "N" "sp2" }
+>> 	{ "s"   "S" "sp2" }
+>> 	{ "s2"   "S" "sp2" }
+>> 	{ "s3"   "S" "sp3" }
+>> 	{ "s4"   "S" "sp3" }
+>> 	{ "s6"   "S" "sp3" }
+>> 	{ "sh"   "S" "sp3" }
+>> 	{ "ss"   "S" "sp3" }
+>> 	{ "sx"   "S" "sp3" }
+>> 	{ "sy"   "S" "sp3" }
+>> 	{ "p2"   "P" "sp2" }
+>> 	{ "p3"   "P" "sp3" }
+>> 	{ "p4"   "P" "sp3" }
+>> 	{ "p5"   "P" "sp3" }
+>> 	{ "pb"   "P" "sp3" }
+>> 	{ "pc"   "P" "sp3" }
+>> 	{ "pd"   "P" "sp3" }
+>> 	{ "pe"   "P" "sp3" }
+>> 	{ "pf"   "P" "sp3" }
+>> 	{ "px"   "P" "sp3" }
+>> 	{ "py"   "P" "sp3" }
+>> 	{ "f"   "F" "sp3" }
+>> 	{ "cl"  "Cl" "sp3" }
+>> 	{ "br"  "Br" "sp3" }
+>> 	{ "i"   "I"  "sp3" }
+>> }
+>> #
+>> #	Load the general force field parameter set.
+>> #
+>> gaff = loadamberparams gaff.dat
+Loading parameters: /home/joan/prog/amber16/dat/leap/parm/gaff.dat
+Reading title:
+AMBER General Force Field for organic molecules (Version 1.8, Mar 2015)
+> 
+> mods = loadamberparams LIG1_AC.frcmod
+Loading parameters: ./LIG1_AC.frcmod
+Reading force field modification type file (frcmod)
+Reading title:
+remark goes here
+> B1P = loadmol2 LIG1_bcc_gaff.mol2
+Loading Mol2 file: ./LIG1_bcc_gaff.mol2
+Reading MOLECULE named LIG1.pdb
+> check B1P
+Checking 'B1P'....
+Warning: Close contact of 1.185602 angstroms between .R<B1P 1>.A<H32 32> and .R<B1P 1>.A<H20 57>
+Checking parameters for unit 'B1P'.
+Checking for bond parameters.
+Checking for angle parameters.
+check:  Warnings: 1
+Unit is OK.
+> saveamberparm B1P LIG1_AC.prmtop LIG1_AC.inpcrd
+Checking Unit.
+Building topology.
+Building atom parameters.
+Building bond parameters.
+Building angle parameters.
+Building proper torsion parameters.
+Building improper torsion parameters.
+--Impropers:
+  1	C12<B1P> - C14<B1P> - C13<B1P> - C18<B1P>
+  1	C13<B1P> - H14<B1P> - C14<B1P> - C15<B1P>
+  1	C13<B1P> - H18<B1P> - C18<B1P> - C17<B1P>
+  1	C14<B1P> - H15<B1P> - C15<B1P> - C16<B1P>
+  1	C15<B1P> - C17<B1P> - C16<B1P> - H16<B1P>
+  1	C18<B1P> - H17<B1P> - C17<B1P> - C16<B1P>
+  1	C19<B1P> - C12<B1P> - N3<B1P> - C3<B1P>
+  1	C19<B1P> - C21<B1P> - C20<B1P> - H20<B1P>
+  1	C22<B1P> - C20<B1P> - C21<B1P> - H21<B1P>
+  1	C23<B1P> - H22<B1P> - C22<B1P> - C21<B1P>
+  1	C24<B1P> - N3<B1P> - C19<B1P> - C20<B1P>
+  1	H23<B1P> - C24<B1P> - C23<B1P> - C22<B1P>
+  1	H24<B1P> - C23<B1P> - C24<B1P> - C19<B1P>
+ total 13 improper torsions applied
+Building H-Bond parameters.
+Incorporating Non-Bonded adjustments.
+Not Marking per-residue atom chain types.
+Marking per-residue atom chain types.
+  (Residues lacking connect0/connect1 - 
+   these don't have chain types marked:
+
+	res	total affected
+
+	B1P	1
+  )
+ (no restraints)
+> saveoff B1P LIG1_AC.lib
+ Creating LIG1_AC.lib
+Saving B1P.
+Building topology.
+Building atom parameters.
+> quit
+	Quit
