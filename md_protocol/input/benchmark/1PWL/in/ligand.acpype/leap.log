@@ -1,0 +1,153 @@
+log started: Wed Apr 11 17:55:41 2018
+
+Log file: ./leap.log
+>> #
+>> # ----- leaprc for loading the general Amber Force field.
+>> #       This file is mostly for use with Antechamber
+>> #
+>> #	load atom type hybridizations
+>> #
+>> addAtomTypes {
+>> 	{ "h1"  "H" "sp3" }
+>> 	{ "h2"  "H" "sp3" }
+>> 	{ "h3"  "H" "sp3" }
+>> 	{ "h4"  "H" "sp3" }
+>> 	{ "h5"  "H" "sp3" }
+>> 	{ "ha"  "H" "sp3" }
+>> 	{ "hc"  "H" "sp3" }
+>> 	{ "hn"  "H" "sp3" }
+>> 	{ "ho"  "H" "sp3" }
+>> 	{ "hp"  "H" "sp3" }
+>> 	{ "hs"  "H" "sp3" }
+>> 	{ "hw"  "H" "sp3" }
+>> 	{ "hx"  "H" "sp3" }
+>> 	{ "o"  "O" "sp2" }
+>> 	{ "o2"  "O" "sp2" }
+>> 	{ "oh"  "O" "sp3" }
+>> 	{ "os"  "O" "sp3" }
+>> 	{ "ow"  "O" "sp3" }
+>> 	{ "c"  "C" "sp2" }
+>> 	{ "c1"  "C" "sp2" }
+>> 	{ "c2"  "C" "sp2" }
+>> 	{ "c3"  "C" "sp3" }
+>> 	{ "ca"  "C" "sp2" }
+>> 	{ "cc"  "C" "sp2" }
+>> 	{ "cd"  "C" "sp2" }
+>> 	{ "ce"  "C" "sp2" }
+>> 	{ "cf"  "C" "sp2" }
+>> 	{ "cg"  "C" "sp2" }
+>> 	{ "ch"  "C" "sp2" }
+>> 	{ "cp"  "C" "sp2" }
+>> 	{ "cq"  "C" "sp2" }
+>> 	{ "cu"  "C" "sp2" }
+>> 	{ "cv"  "C" "sp2" }
+>> 	{ "cx"  "C" "sp2" }
+>> 	{ "cy"  "C" "sp2" }
+>> 	{ "cz"  "C" "sp2" }
+>> 	{ "n"   "N" "sp2" }
+>> 	{ "n1"  "N" "sp2" }
+>> 	{ "n2"  "N" "sp2" }
+>> 	{ "n3"  "N" "sp3" }
+>> 	{ "n4"  "N" "sp3" }
+>> 	{ "na"  "N" "sp2" }
+>> 	{ "nb"  "N" "sp2" }
+>> 	{ "nc"  "N" "sp2" }
+>> 	{ "nd"  "N" "sp2" }
+>> 	{ "ne"  "N" "sp2" }
+>> 	{ "nf"  "N" "sp2" }
+>> 	{ "nh"  "N" "sp2" }
+>> 	{ "no"  "N" "sp2" }
+>> 	{ "s"   "S" "sp2" }
+>> 	{ "s2"   "S" "sp2" }
+>> 	{ "s3"   "S" "sp3" }
+>> 	{ "s4"   "S" "sp3" }
+>> 	{ "s6"   "S" "sp3" }
+>> 	{ "sh"   "S" "sp3" }
+>> 	{ "ss"   "S" "sp3" }
+>> 	{ "sx"   "S" "sp3" }
+>> 	{ "sy"   "S" "sp3" }
+>> 	{ "p2"   "P" "sp2" }
+>> 	{ "p3"   "P" "sp3" }
+>> 	{ "p4"   "P" "sp3" }
+>> 	{ "p5"   "P" "sp3" }
+>> 	{ "pb"   "P" "sp3" }
+>> 	{ "pc"   "P" "sp3" }
+>> 	{ "pd"   "P" "sp3" }
+>> 	{ "pe"   "P" "sp3" }
+>> 	{ "pf"   "P" "sp3" }
+>> 	{ "px"   "P" "sp3" }
+>> 	{ "py"   "P" "sp3" }
+>> 	{ "f"   "F" "sp3" }
+>> 	{ "cl"  "Cl" "sp3" }
+>> 	{ "br"  "Br" "sp3" }
+>> 	{ "i"   "I"  "sp3" }
+>> }
+>> #
+>> #	Load the general force field parameter set.
+>> #
+>> gaff = loadamberparams gaff.dat
+Loading parameters: /home/joan/prog/amber16/dat/leap/parm/gaff.dat
+Reading title:
+AMBER General Force Field for organic molecules (Version 1.8, Mar 2015)
+> 
+> mods = loadamberparams ligand_AC.frcmod
+Loading parameters: ./ligand_AC.frcmod
+Reading force field modification type file (frcmod)
+Reading title:
+remark goes here
+> LIG = loadmol2 ligand_bcc_gaff.mol2
+Loading Mol2 file: ./ligand_bcc_gaff.mol2
+Reading MOLECULE named ligand.pdb
+> check LIG
+Checking 'LIG'....
+Checking parameters for unit 'LIG'.
+Checking for bond parameters.
+Checking for angle parameters.
+Unit is OK.
+> saveamberparm LIG ligand_AC.prmtop ligand_AC.inpcrd
+Checking Unit.
+Building topology.
+Building atom parameters.
+Building bond parameters.
+Building angle parameters.
+Building proper torsion parameters.
+Building improper torsion parameters.
+--Impropers:
+  1	C11<LIG> - C4<LIG> - C7<LIG> - C3<LIG>
+  1	C18<LIG> - O15<LIG> - C21<LIG> - N14<LIG>
+  1	C21<LIG> - C39<LIG> - N14<LIG> - HN<LIG>
+  1	C23<LIG> - C22<LIG> - N17<LIG> - C11<LIG>
+  1	C25<LIG> - C31<LIG> - C28<LIG> - H28<LIG>
+  1	C27<LIG> - C28<LIG> - C31<LIG> - H31<LIG>
+  1	C29<LIG> - C23<LIG> - C25<LIG> - C28<LIG>
+  1	C2<LIG> - C6<LIG> - C5<LIG> - F9<LIG>
+  1	C30<LIG> - Br36<LIG> - C27<LIG> - C31<LIG>
+  1	C3<LIG> - C5<LIG> - C6<LIG> - H6<LIG>
+  1	C4<LIG> - H2<LIG> - C2<LIG> - C5<LIG>
+  1	C7<LIG> - H3<LIG> - C3<LIG> - C6<LIG>
+  1	C8<LIG> - C7<LIG> - C4<LIG> - C2<LIG>
+  1	C8<LIG> - N14<LIG> - C39<LIG> - O37<LIG>
+  1	F33<LIG> - C30<LIG> - C29<LIG> - C25<LIG>
+  1	H30<LIG> - C29<LIG> - C30<LIG> - C27<LIG>
+  1	N17<LIG> - O16<LIG> - C11<LIG> - C7<LIG>
+  1	O13<LIG> - N17<LIG> - C22<LIG> - C8<LIG>
+ total 18 improper torsions applied
+Building H-Bond parameters.
+Incorporating Non-Bonded adjustments.
+Not Marking per-residue atom chain types.
+Marking per-residue atom chain types.
+  (Residues lacking connect0/connect1 - 
+   these don't have chain types marked:
+
+	res	total affected
+
+	LIG	1
+  )
+ (no restraints)
+> saveoff LIG ligand_AC.lib
+ Creating ligand_AC.lib
+Saving LIG.
+Building topology.
+Building atom parameters.
+> quit
+	Quit
