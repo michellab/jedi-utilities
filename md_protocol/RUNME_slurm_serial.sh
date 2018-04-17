@@ -4,9 +4,14 @@ function globexist # To check if ligands exist ([-e *GMX*] crashes if there is m
   }
 
 gmx=/home/joan/local/gromacs-5.1.4.serial/bin/gmx_mpi
+plumed=/home/joan/local/bin/plumed
 ntomp=16
 
 md="
+    function globexist # To check if ligands exist ([-e *GMX*] crashes if there is more than 1)
+  {
+   test -e "$1" -o -L "$1"
+  }
   
     mkdir jedi_files
     mkdir complex apoWet apoDry
@@ -16,7 +21,7 @@ md="
       cp jedi.params jedi_monitor.dat ../complex
       cp jedi.params jedi_monitor.dat ../apoWet
       cp jedi.params jedi_monitor.dat ../apoDry
-      plumed driver --mf_pdb protein_apo.pdb --plumed jedi_monitor.dat
+      $plumed driver --mf_pdb protein_apo.pdb --plumed jedi_monitor.dat
     cd ..
 
     cd in/
@@ -112,8 +117,7 @@ md="
   "
 
 
-slurm="
-#!/bin/bash
+slurm="#!/bin/bash
 #SBATCH --job-name=$pdb
 #SBATCH -o JEDI2_MDtest.out
 #SBATCH -e JEDI2_MDtest.err
@@ -132,6 +136,19 @@ cd output
 cd benchmark
 for pdb in $(ls -d */); do
  cd $pdb
+
+slurm="#!/bin/bash
+#SBATCH --job-name=$pdb
+#SBATCH -o JEDI2_MDtest.out
+#SBATCH -e JEDI2_MDtest.err
+#SBATCH -p serial 
+#SBATCH -n 16 
+#SBATCH -N 1
+##SBATCH --gres=gpu:1 #this line is commented out in the cpu scripts
+#SBATCH --time 48:00:00
+module load gromacs/5.1.4
+"
+
    echo "Processing system $pdb"
    echo "$slurm" > mdsub.sh
    echo "$md" >> mdsub.sh
