@@ -3,20 +3,16 @@ function globexist # To check if ligands exist ([-e *GMX*] crashes if there is m
    test -e "$1" -o -L "$1"
   }
 
-rm -rfI output
-cp -r input output
-cd output
 
-cd benchmark
-for pdb in $(ls -d */); do
-   cd $pdb
+function md
+  {
     mkdir jedi_files
     mkdir complex apoWet apoDry
     cd jedi_files
       cp ../in/protein_apo.pdb ../in/ligand.pdb ../../../jedi_files/* . 
       python ../../../../../scripts/jedi-setup.py -i protein_apo.pdb -l ligand.pdb -c 0.6 -s 0.15 -a apolar.pdb -p polar.pdb -g grid.pdb
       cp jedi.params jedi_monitor.dat ../complex
-      cp jedi.params jedi_monitor.dat ../apoWet 
+      cp jedi.params jedi_monitor.dat ../apoWet
       cp jedi.params jedi_monitor.dat ../apoDry
       plumed driver --mf_pdb protein_apo.pdb --plumed jedi_monitor.dat
     cd ..
@@ -29,7 +25,7 @@ for pdb in $(ls -d */); do
      cp complex_protein.pdb *acpype/*GMX.gro *acpype/*GMX.itp ../complex/
      cp apoWet_protein.pdb ../apoWet/
      cp apoDry_protein.pdb ../apoDry/
-     if  globexist LIG*acpype; then 
+     if  globexist LIG*acpype; then
       cp  LIG*acpype/*GMX.gro LIG*acpype/*GMX.itp ../apoWet/
       cp  LIG*acpype/*GMX.gro LIG*acpype/*GMX.itp ../apoDry/
      fi
@@ -86,10 +82,9 @@ for pdb in $(ls -d */); do
      gmx grompp -f ../../../../../mdp/md.mdp -c apoWet_npt.gro -p apoWet.top -o apoWet_md.tpr
      gmx mdrun -v -deffnm apoWet_md -nsteps 25000000 -plumed jedi_monitor.dat
      if [ ! -f apoWet_md.gro ]; then continue; fi
+    cd ..
 
-   cd ..
-skip
-   cd apoDry
+    cd apoDry
      bash ../../../../../scripts/gmx5_setup.sh apoDry
      if [ ! -f apoDry_ions.gro ]; then continue; fi
      gmx grompp -f ../../../../../mdp/em_10000_sd.mdp -c apoDry_ions.gro -p apoDry.top -o apoDry_em_sd.tpr
@@ -111,7 +106,27 @@ skip
      gmx grompp -f ../../../../../mdp/md.mdp -c apoDry_npt.gro -p apoDry.top -o apoDry_md.tpr
      gmx mdrun -v -deffnm apoDry_md -nsteps 25000000 -plumed jedi_monitor.dat
      if [ ! -f apoDry_md.gro ]; then continue; fi
-   cd ..
+    cd ..
+  }
 
+nthreads=8
+ntomp=2
+let max_proc=nthreads/ntomp
+rm -rfI output
+cp -r input output
+cd output
+
+cd benchmark
+proc=0
+for pdb in $(ls -d */); do
+ cd $pdb
+   echo "Processing system $pdb"
+   md &
+   let proc=proc+1
+   if [ $proc -eq $max_proc ]; then
+      wait 
+      proc=0
+   fi
+ cd ..
 done
 
