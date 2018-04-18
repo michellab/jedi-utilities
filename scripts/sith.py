@@ -27,7 +27,7 @@ import scipy, math
 from scipy import spatial
 import glob, os, sys
 import time as tiempo
-import psutil
+#import psutil
 import pymp #https://github.com/classner/pymp.git
 
 parser = argparse.ArgumentParser(description="Perform an iterative taboo search using the JEDI collective variable",

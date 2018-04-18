@@ -8,7 +8,7 @@ emstep          = 0.01          ; Energy step size
 nsteps		= 10000	  	; Maximum number of (minimization) steps to perform
 energygrps	= System	; Which energy group(s) to write to disk
 nstxout         = 0           ; print coordinates frequence
-nstvout         = 0           : print velocities frquence
+nstvout         = 0           ; print velocities frquence
 
 
 ; Parameters describing how to find the neighbors of each atom and how to calculate the interactions
