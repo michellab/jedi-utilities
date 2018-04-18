@@ -40,23 +40,23 @@ function md
      cp apolar.pdb polar.pdb grid.pdb ../apoWet
      cp apolar.pdb polar.pdb grid.pdb ../apoDry
      gmx grompp -f ../../../../../mdp/em_10000_sd.mdp -c complex_ions.gro -p complex.top -o complex_em_sd.tpr
-     gmx mdrun -v -deffnm complex_em_sd -plumed jedi_monitor.dat -nsteps 10000
+     gmx mdrun -ntomp $ntomp -v -deffnm complex_em_sd -plumed jedi_monitor.dat -nsteps 10000
      if [ ! -f complex_em_sd.gro ]; then continue; fi
      mv COLVAR sd_COLVAR
      gmx grompp -f ../../../../../mdp/em_10000_cg.mdp -c complex_em_sd.gro -p complex.top -o complex_em_cg.tpr
-     gmx mdrun -v -deffnm complex_em_cg -plumed jedi_monitor.dat -nsteps 10000
+     gmx mdrun -ntomp $ntomp -v -deffnm complex_em_cg -plumed jedi_monitor.dat -nsteps 10000
      if [ ! -f complex_em_cg.gro ]; then continue; fi
      mv COLVAR cg_COLVAR
      gmx grompp -f ../../../../../mdp/nvt.mdp -c complex_em_cg.gro -p complex.top -o complex_nvt.tpr
-     gmx mdrun -v -deffnm complex_nvt -nsteps 100000 -plumed jedi_monitor.dat
+     gmx mdrun -ntomp $ntomp -v -deffnm complex_nvt -nsteps 100000 -plumed jedi_monitor.dat
      if [ ! -f complex_nvt.gro ]; then continue; fi
      mv COLVAR nvt_COLVAR
      gmx grompp -f ../../../../../mdp/nvt.mdp -c complex_nvt.gro -p complex.top -o complex_npt.tpr
-     gmx mdrun -v -deffnm complex_npt -nsteps 100000 -plumed jedi_monitor.dat
+     gmx mdrun -ntomp $ntomp -v -deffnm complex_npt -nsteps 100000 -plumed jedi_monitor.dat
      if [ ! -f complex_npt.gro ]; then continue; fi
      mv COLVAR npt_COLVAR
      gmx grompp -f ../../../../../mdp/md.mdp -c complex_npt.gro -p complex.top -o complex_md.tpr
-     gmx mdrun -v -deffnm complex_md -nsteps 25000000 -plumed jedi_monitor.dat
+     gmx mdrun -ntomp $ntomp -v -deffnm complex_md -nsteps 25000000 -plumed jedi_monitor.dat
      if [ ! -f complex_md.gro ]; then continue; fi
     cd ..
 
@@ -64,23 +64,23 @@ function md
      bash ../../../../../scripts/gmx5_setup.sh apoWet
      if [ ! -f apoWet_ions.gro ]; then continue; fi
      gmx grompp -f ../../../../../mdp/em_10000_sd.mdp -c apoWet_ions.gro -p apoWet.top -o apoWet_em_sd.tpr
-     gmx mdrun -v -deffnm apoWet_em_sd -plumed jedi_monitor.dat -nsteps 10000
+     gmx mdrun -ntomp $ntomp -v -deffnm apoWet_em_sd -plumed jedi_monitor.dat -nsteps 10000
      if [ ! -f apoWet_em_sd.gro ]; then continue; fi
      mv COLVAR sd_COLVAR
      gmx grompp -f ../../../../../mdp/em_10000_cg.mdp -c apoWet_em_sd.gro -p apoWet.top -o apoWet_em_cg.tpr
-     gmx mdrun -v -deffnm apoWet_em_cg -plumed jedi_monitor.dat -nsteps 10000
+     gmx mdrun -ntomp $ntomp -v -deffnm apoWet_em_cg -plumed jedi_monitor.dat -nsteps 10000
      if [ ! -f apoWet_em_cg.gro ]; then continue; fi
      mv COLVAR cg_COLVAR
      gmx grompp -f ../../../../../mdp/nvt.mdp -c apoWet_em_cg.gro -p apoWet.top -o apoWet_nvt.tpr
-     gmx mdrun -v -deffnm apoWet_nvt -nsteps 100000 -plumed jedi_monitor.dat
+     gmx mdrun -ntomp $ntomp -v -deffnm apoWet_nvt -nsteps 100000 -plumed jedi_monitor.dat
      if [ ! -f apoWet_nvt.gro ]; then continue; fi
      mv COLVAR nvt_COLVAR
      gmx grompp -f ../../../../../mdp/nvt.mdp -c apoWet_nvt.gro -p apoWet.top -o apoWet_npt.tpr
-     gmx mdrun -v -deffnm apoWet_npt -nsteps 100000 -plumed jedi_monitor.dat
+     gmx mdrun -ntomp $ntomp -v -deffnm apoWet_npt -nsteps 100000 -plumed jedi_monitor.dat
      if [ ! -f apoWet_npt.gro ]; then continue; fi
      mv COLVAR npt_COLVAR
      gmx grompp -f ../../../../../mdp/md.mdp -c apoWet_npt.gro -p apoWet.top -o apoWet_md.tpr
-     gmx mdrun -v -deffnm apoWet_md -nsteps 25000000 -plumed jedi_monitor.dat
+     gmx mdrun -ntomp $ntomp -v -deffnm apoWet_md -nsteps 25000000 -plumed jedi_monitor.dat
      if [ ! -f apoWet_md.gro ]; then continue; fi
     cd ..
 
@@ -88,29 +88,29 @@ function md
      bash ../../../../../scripts/gmx5_setup.sh apoDry
      if [ ! -f apoDry_ions.gro ]; then continue; fi
      gmx grompp -f ../../../../../mdp/em_10000_sd.mdp -c apoDry_ions.gro -p apoDry.top -o apoDry_em_sd.tpr
-     gmx mdrun -v -deffnm apoDry_em_sd -plumed jedi_monitor.dat -nsteps 10000
+     gmx mdrun -ntomp $ntomp -v -deffnm apoDry_em_sd -plumed jedi_monitor.dat -nsteps 10000
      if [ ! -f apoDry_em_sd.gro ]; then continue; fi
      mv COLVAR sd_COLVAR
      gmx grompp -f ../../../../../mdp/em_10000_cg.mdp -c apoDry_em_sd.gro -p apoDry.top -o apoDry_em_cg.tpr
-     gmx mdrun -v -deffnm apoDry_em_cg -plumed jedi_monitor.dat -nsteps 10000
+     gmx mdrun -ntomp $ntomp -v -deffnm apoDry_em_cg -plumed jedi_monitor.dat -nsteps 10000
      if [ ! -f apoDry_em_cg.gro ]; then continue; fi
      mv COLVAR cg_COLVAR
      gmx grompp -f ../../../../../mdp/nvt.mdp -c apoDry_em_cg.gro -p apoDry.top -o apoDry_nvt.tpr
-     gmx mdrun -v -deffnm apoDry_nvt -nsteps 100000 -plumed jedi_monitor.dat
+     gmx mdrun -ntomp $ntomp -v -deffnm apoDry_nvt -nsteps 100000 -plumed jedi_monitor.dat
      if [ ! -f apoDry_nvt.gro ]; then continue; fi
      mv COLVAR nvt_COLVAR
      gmx grompp -f ../../../../../mdp/nvt.mdp -c apoDry_nvt.gro -p apoDry.top -o apoDry_npt.tpr
-     gmx mdrun -v -deffnm apoDry_npt -nsteps 100000 -plumed jedi_monitor.dat
+     gmx mdrun -ntomp $ntomp -v -deffnm apoDry_npt -nsteps 100000 -plumed jedi_monitor.dat
      if [ ! -f apoDry_npt.gro ]; then continue; fi
      mv COLVAR npt_COLVAR
      gmx grompp -f ../../../../../mdp/md.mdp -c apoDry_npt.gro -p apoDry.top -o apoDry_md.tpr
-     gmx mdrun -v -deffnm apoDry_md -nsteps 25000000 -plumed jedi_monitor.dat
+     gmx mdrun -ntomp $ntomp -v -deffnm apoDry_md -nsteps 25000000 -plumed jedi_monitor.dat
      if [ ! -f apoDry_md.gro ]; then continue; fi
     cd ..
   }
 
 nthreads=8
-ntomp=2
+ntomp=8
 let max_proc=nthreads/ntomp
 rm -rfI output
 cp -r input output
