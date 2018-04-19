@@ -648,7 +648,7 @@ def setupMetric(parameters):
        fileout.close()
        print "The sines and cosines of "+str(len(chi.keys()))+ " torsions are going to be used as a metric."
        print "This is a total of "+str(2*len(chi.keys()))+" variables"
-       return chi
+       return chi,residues_str
 
           
 def analyse_target(parameters,metric_input):
@@ -1549,7 +1549,7 @@ if __name__ == '__main__':
 
    ######### PREPARE FILES TO BE USED  ######################
    
-    metric_input=setupMetric(parameters) # Get the necessary parameters for the metric of use
+    metric_input,residues_str=setupMetric(parameters) # Get the necessary parameters for the metric of use
 
     if parameters['target'] is not None:
        metricAvgTarget,metricSDTarget,cvAvgTarget,cvSDTarget,max_cv,min_cv=analyse_target(parameters,metric_input)
