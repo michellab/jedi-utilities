@@ -652,6 +652,7 @@ def setupMetric(parameters):
        fileout.close()
        print "The sines and cosines of "+str(len(chi.keys()))+ " torsions are going to be used as a metric."
        print "This is a total of "+str(2*len(chi.keys()))+" variables"
+<<<<<<< HEAD
        return chi, residues_str
 
 ########################
@@ -696,6 +697,9 @@ def setupMetric(parameters):
        elif cv=='JEDI':
           apolar=parameters['apolar']
           polar=parameters['polar']
+=======
+       return chi,residues_str
+>>>>>>> 622d00d0f725afeb9ea2563a7a71208f9678c8d1
 
           residues_str=[]
           residues=[]
