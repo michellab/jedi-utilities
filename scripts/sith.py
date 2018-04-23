@@ -267,6 +267,10 @@ ERROR ! The input cannot be found. See usage above.
         print "The time in ps for which a populated cluster has to be sampled must be defined with option 'sampltime='. Exiting."
         sys.exit()
     
+    if 'lipo' not in parameters.keys():
+       parameters['lipo']=0
+    else:
+       parameters['lipo']=int(parameters['lipo'])
     return parameters
 
 
@@ -543,7 +547,7 @@ def setupMetric(parameters):
               parameters[spec]=None
            else:
               atLeastOne=True
-       if (atLeastOne==False and cv is not 'JEDI') or (not os.path.isfile(parameters['apolar']) or not os.path.isfile(parameters['polar'])):
+       if (atLeastOne==False and cv!='JEDI') or (not os.path.isfile(parameters['apolar']) or not os.path.isfile(parameters['polar'])):
           print "You need to specify how the torsions will be chosen (whole SC (SC_list) or just some TOR (TOR_list)). eXITING."
           sys.exit()
        if parameters['SC_list'] is not None:
@@ -648,7 +652,7 @@ def setupMetric(parameters):
        fileout.close()
        print "The sines and cosines of "+str(len(chi.keys()))+ " torsions are going to be used as a metric."
        print "This is a total of "+str(2*len(chi.keys()))+" variables"
-       return chi
+       return chi, residues_str
 
 ########################
     if metric=='BB_TORSION': #FIXME: need to specify that it has to be pdb and raise an error if it's not
@@ -783,7 +787,7 @@ def setupMetric(parameters):
        fileout.close()
        print "The sines and cosines of "+str(len(phi_psi.keys()))+ " torsions are going to be used as a metric."
        print "This is a total of "+str(2*len(phi_psi.keys()))+" variables"
-       return phi_psi
+       return phi_psi, residues_str
 
 
 ########################
@@ -972,7 +976,7 @@ def gen_plumed_input(parameters,include,clusters,bias_keys,max_cv,min_cv):
         fileout.write(line)
         
  
-    if metric=='SC_TORSION':
+    if metric=='SC_TORSION' or metric=='BB_TORSION':
        metric_lab=[]
        for key in metric_input.keys():
            sin='sin_'+key
@@ -1008,7 +1012,7 @@ def gen_plumed_input(parameters,include,clusters,bias_keys,max_cv,min_cv):
             os.system(cmd)
             cmd='sed -i "s/FILE=total_bias/FILE=total_bias.'+str(i)+'/g" taboo_bias.'+str(i)+'.dat'
             os.system(cmd)
-
+    return metric_lab
 def build_metric_bias(parameters,clusters,metric_arr,iteration,metric_input,time):
 
     include=[]
@@ -1628,6 +1632,13 @@ def generate_restarts(clusters,outliers,iteration,parameters):
        fileout.close()
        if parameters['debug']==False:
           os.system('rm restart*gro *mdout*')
+
+       toporig=parameters['top']+'.orig'
+       if os.path.isfile(toporig):
+          cmd='mv '+parameters['top']+' '+parameters['top']+'.'+str(iteration)
+          os.system(cmd)
+          cmd='mv '+toporig+' '+parameters['top']
+          os.system(cmd)
     
 def calc_avg(iteration,time,clusters,typeclust,cv_arr,metric_arr,metricAvgTarget,metricSDTarget,cvAvgTarget,cvSDTarget):
     nameOut='distance_target_'+typeclust+'.'+str(iteration)
@@ -1664,8 +1675,63 @@ def calc_avg(iteration,time,clusters,typeclust,cv_arr,metric_arr,metricAvgTarget
              str(dist_avg)+' '+str(dist_sd)+' '+super_metric
         fileout.write(line)
     fileout.close()
-    
-    
+
+
+def lipophiliser(parameters,metric_arr,residues_str,metric_lab):
+    top=parameters['top']
+    sd=np.std(metric_arr,axis=0)
+    print sd
+    idx=np.argpartition(sd,parameters['lipo'])[:(parameters['lipo'])]
+    print idx
+    restolip=[]
+    for element in idx:
+        resi=metric_lab[element].split('_')[2]
+        resnum=resi[3:]
+        resname=resi[0:3]
+        if resnum not in restolip:
+           restolip.append(resnum)
+        print resi, resnum, resname
+        
+    print restolip
+
+    toporig=top+'.orig'
+    cmd='mv '+top+' '+toporig
+    os.system(cmd)
+    filein=open(toporig,'r')
+    fileout=open(top,'w')
+    switch=False
+    for line in filein:
+        if line=='\n':
+           fileout.write(line)
+           continue
+        if '[ atoms ]' in line:
+           switch=True
+           fileout.write(line)
+           continue
+        if '[ bonds ]' in line:
+           switch=False
+           fileout.write(line)
+           continue
+        if switch==True:
+           if line.startswith(';'):
+              fileout.write(line)
+              continue
+           elif line.split()[2] in restolip: 
+              line_lst=line.split()
+              if '-' in line_lst[6]:
+                  line=line.replace(line_lst[6],' 0.0000')
+                  fileout.write(line)
+                  continue
+              else:
+                  line=line.replace(line_lst[6],'0.0000')
+                  fileout.write(line)
+                  continue
+           else:
+              fileout.write(line)
+              continue
+        else:
+           fileout.write(line)
+           continue
 
 if __name__ == '__main__':
 
@@ -1686,7 +1752,7 @@ if __name__ == '__main__':
 
    ######### PREPARE FILES TO BE USED  ######################
    
-    metric_input=setupMetric(parameters) # Get the necessary parameters for the metric of use
+    metric_input,residues_str=setupMetric(parameters) # Get the necessary parameters for the metric of use
 
     if parameters['target'] is not None:
        metricAvgTarget,metricSDTarget,cvAvgTarget,cvSDTarget,max_cv,min_cv=analyse_target(parameters,metric_input)
@@ -1702,7 +1768,9 @@ if __name__ == '__main__':
           cmd='cat cluster_time.txt >> cluster_time.bckp'
        os.system(cmd)
        #FIXME: Depending on where the program crashes, the COLVAR file ends up being shorter or longer than it should
-       cv_arr,metric_arr,time,max_cv,min_cv=combine_trajectories(st_iter-1,parameters,True,cvAvgTarget,metricAvgTarget) 
+       cv_arr,metric_arr,time,max_cv,min_cv=combine_trajectories(st_iter-1,parameters,True,cvAvgTarget,metricAvgTarget)
+       if parameters['lipo']>0:
+          top_new=lipophiliser(parameters,metric_arr,residues_str,metric_lab)
        start=tiempo.time()
        clusters,outliers=clustering(time,metric_arr,st_iter-1,parameters)
        end=tiempo.time()
@@ -1743,10 +1811,12 @@ if __name__ == '__main__':
            bias_keys=[]
            clusters={}
 
-        taboo_plumedat=gen_plumed_input(parameters,include,clusters,bias_keys,max_cv,min_cv)
+        metric_lab=gen_plumed_input(parameters,include,clusters,bias_keys,max_cv,min_cv)
         print "Iteration "+str(iteration)+" is going to be submitted."
         crashes=submit_calc(parameters,iteration,crashes)  
         cv_arr,metric_arr,time,max_cv,min_cv=combine_trajectories(iteration,parameters,False,cvAvgTarget,metricAvgTarget)
+        if parameters['lipo']>0:
+           top_new=lipophiliser(parameters,metric_arr,residues_str,metric_lab)
         start=tiempo.time()
         clusters,outliers=clustering(time,metric_arr,iteration,parameters)
         end=tiempo.time()
