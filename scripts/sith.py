@@ -94,12 +94,14 @@ ERROR ! The input cannot be found. See usage above.
                 sys.exit()
             
             parameters[line[0]]=line[1]
-
+    if 'max_crashes' in parameters.keys():
+        args.crash=True
     if args.crash is True:
        print "SITH is going to stop if maximum number of allowed crashes is reached."
        parameters['crash']=True
        if 'max_crashes' not in parameters.keys():
            print "The maximum number of crashes is not specified. Setting it to 1."
+           parameters['max_crashes']=1
        else:
            parameters['max_crashes']=int(parameters['max_crashes'])
            print "The maximum number of allowed crashes is ", parameters['max_crashes']
@@ -696,8 +698,6 @@ def setupMetric(parameters):
        elif cv=='JEDI':
           apolar=parameters['apolar']
           polar=parameters['polar']
-       return chi,residues_str
-
           residues_str=[]
           residues=[]
           for pdb in [apolar,polar]:
