@@ -277,18 +277,22 @@ ERROR ! The input cannot be found. See usage above.
 
 
 def setup_queue(parameters):
-    supported_queues=['slurm']
+    supported_queues=[None,'slurm']
     
     if 'q_system' not in parameters.keys():
-       parameters['q_system']='slurm'
-    elif parameters['q_system'] not in supported_queues:
+       print "Queue system not specified. Going to run in interactive mode."
+       parameters['q_system']=None
+    if parameters['q_system'] not in supported_queues:
         print "ERROR: Queue system '"+parameters['q_system']+"' is not supported."
         print "Supported queue systems are: "+','.join(supported_queues)
         sys.exit()
     
-    if 'q_name' not in parameters.keys():
-       print "Error: The queue name must be specified with option 'q_name='. Exiting."
-       sys.exit()
+    if 'q_name' not in parameters.keys(): 
+        if parameters['q_system'] is not None:
+            print "Error: The queue name must be specified with option 'q_name='. Exiting."
+            sys.exit()
+        else:
+           parameters['q_name']=None
     
     if 'q_time' not in parameters.keys():
         print "Maximum time for the job was not specified. Setting it to 24 hours."
@@ -305,7 +309,7 @@ def setup_queue(parameters):
 
     if parameters['q_system']=='archer':
        print "Setting up que jobs for ARCHER."
-       print "If specified, the variable nthreads will be overriden woith 24 times \
+       print "If specified, the variable nthreads will be overriden with 24 times \
               the number of nodes to be used"
        if 'num_nodes' not in parameters.keys():
           print "Number of nodes was not selected. Setting it to 1"
@@ -1157,9 +1161,11 @@ def submit_calc(parameters,iteration,crashes):
        line='touch '+name_time # This is just to check whether the calculation finished or not
        fileout.write(line)
     fileout.close()
-    #sys.exit()
 
     # Sumbitting the job
+    if q_system==None:
+       cmd='bash '+nameOut
+       os.system(cmd)
     if q_system=='slurm':
        cmd=parameters['sbatch']+' '+nameOut
        os.system(cmd)
@@ -1758,7 +1764,7 @@ if __name__ == '__main__':
     if parameters['target'] is not None:
        metricAvgTarget,metricSDTarget,cvAvgTarget,cvSDTarget,max_cv,min_cv=analyse_target(parameters,metric_input)
     else:
-       metricAvgTarget,metricSDTarget,cvAvgTarget,cvSDTarget=None,None,None,None,None,None
+       metricAvgTarget,metricSDTarget,cvAvgTarget,cvSDTarget,max_cv,min_cv=None,None,None,None,None,None
     
     ##### RESTART CALCULATION IF NECESSARY ###################
     st_iter=int(parameters['st_iter'])
