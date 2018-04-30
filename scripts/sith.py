@@ -458,8 +458,8 @@ def getCV(parameters):
 # Check that the metric is supported and it works wit the CV.
 def getMetric(parameters):
 
-    supported_metrics=['SC_TORSION','BB_TORSION']
-    supported_cvs_metric={'SC_TORSION':['JEDI'], 'BB_TORSION':['JEDI']}
+    supported_metrics=['SC_TORSION','BB_TORSION','SC_RMSD','BB_RMSD']
+    supported_cvs_metric={'SC_TORSION':['JEDI'], 'BB_TORSION':['JEDI'],'SC_RMSD':['JEDI']}
     
     if 'metric' not in parameters.keys():
        print "ERROR: The metric that drives the taboo search must be defined with the option 'metric='. Exiting."
@@ -794,6 +794,12 @@ def setupMetric(parameters):
        print "This is a total of "+str(2*len(phi_psi.keys()))+" variables"
        return phi_psi, residues_str
 
+    if metric=='SC_RMSD':
+       sys.exit()
+       # Generate residues_str
+       # Select 
+       
+
 
 ########################
           
@@ -1024,7 +1030,7 @@ def build_metric_bias(parameters,clusters,metric_arr,iteration,metric_input,time
     bias_keys=[]
     # If there are no populated clusters, there is no metric bias to be built.
     if len(clusters.keys())==0:
-       return include
+       return include,bias_keys
     else:
        if parameters['bias']=='LOWER_WALLS' or parameters['bias']=='UPPER_WALLS' or parameters['bias']=='RESTRAINT' or parameters['bias']=='MOVINGRESTRAINT_L':
           clusdist_avg=parameters['at_metric']
@@ -1076,6 +1082,7 @@ def build_metric_bias(parameters,clusters,metric_arr,iteration,metric_input,time
         elif parameters['bias']=='MOVINGRESTRAINT_L':
            first=int(int(parameters['nsteps'])*0.2)
            line='MOVINGRESTRAINT ...\n'+\
+                'LABEL=rest_'+time_str+'_'+str(iteration)+'\n'+\
                 'ARG=dist_'+time_str+'\n'+\
                 'VERSE=L\n'+\
                 'STEP0=0 AT0=0 KAPPA0='+str(kappas[center])+'\n'+\
