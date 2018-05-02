@@ -795,9 +795,63 @@ def setupMetric(parameters):
        return phi_psi, residues_str
 
     if metric=='SC_RMSD':
+       print "using side chain RMSD"
+       alignment=parametres['alignment']
+
+       if 'reference_structure' not in parameters.keys():
+          print "ERROR: you need to provide a reference structure to measure side chain RMSD."
+          print "Use option 'reference_structure=' to provide a file. Exiting."
+          sys.exit()
+       elif not os.path.isfile(parameters['reference_structure']):
+          print "ERROR: file '"+parameters['reference_structure']+"' not found. Exiting."
+          sys.exit()
+       else:
+          structure=parameters['reference_structure']
+
+       if ('SC_list' not in parameters.keys() and cv!='JEDI') or (not os.path.isfile(parameters['apolar']) or not os.path.isfile(parameters['polar'])):
+          print "You need to specify how the torsions will be chosen (whole SC (SC_list) or just some TOR (TOR_list)). eXITING."
+          sys.exit()
+       if "SC_list" in parameters.keys() and parameters['SC_list'] is not None:
+          residues_str=parameters['SC_list'].split(',')
+       elif cv=='JEDI':
+          apolar=parameters['apolar']
+          polar=parameters['polar']
+
+          residues_str=[]
+          residues=[]
+          for pdb in [apolar,polar]:
+              site=mdtraj.load_pdb(pdb)
+              for res in site.topology.residues:
+                  if str(res) not in residues_str and "GLY" not in str(res):
+                     residues_str.append(str(res))
+                     residues.append(res)
+
+       print "The residues that are going to be taken into account are:"
+       print residues_str
+       print "There are", len(residues_str), "residues in the defined binding site (which could be the whole protein!)"
+       
+       #find hydrogens
+
+       resnum=[]
+       for residue in residues_str:
+           resnum.append(residue[3:])
+       filein=open(structure,'r')
+       for line in filein:
+           if line.startswith('ATOM') or line.startswith('HETATM'):
+              if line.split()[3] in ['SOL','HOH','WAT'] or #element is hydrogen:
+                 continue
+              if line.split()[5] in resnum:
+                 if line.split()[2] in ['CA','C','O','N']:
+                    # modify occupancy for alignment
+                 else:
+                    # modify bfactor for rmsd
+              else:
+              
+       # Modify occupancy with 1 or 0 for alignment and bfactor with 1 or 0 for RMSD calculation
+       
        sys.exit()
        # Generate residues_str
-       # Select 
+        
        
 
 
@@ -1035,6 +1089,10 @@ def build_metric_bias(parameters,clusters,metric_arr,iteration,metric_input,time
        if parameters['bias']=='LOWER_WALLS' or parameters['bias']=='UPPER_WALLS' or parameters['bias']=='RESTRAINT' or parameters['bias']=='MOVINGRESTRAINT_L':
           clusdist_avg=parameters['at_metric']
           kappa_metric=float(parameters['kappa_metric'])
+       if clusdist_avg="max" and 'TORSION' in parameters['metric']: 
+          max_dist=2*math.sqrt(len(metric_input.keys()))
+          print max_dist
+          sys.exit()
 
        dt=float(parameters['dt'])
        stride=int(parameters['stride'])
