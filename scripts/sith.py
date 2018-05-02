@@ -838,14 +838,17 @@ def setupMetric(parameters):
        filein=open(structure,'r')
        for line in filein:
            if line.startswith('ATOM') or line.startswith('HETATM'):
-              if line.split()[3] in ['SOL','HOH','WAT'] or #element is hydrogen:
+              if line.split()[3] in ['SOL','HOH','WAT']: #or element is hydrogen:
                  continue
               if line.split()[5] in resnum:
                  if line.split()[2] in ['CA','C','O','N']:
+                    sys.exit()
                     # modify occupancy for alignment
                  else:
+                    sys.exit()
                     # modify bfactor for rmsd
               else:
+                    sys.exit()
               
        # Modify occupancy with 1 or 0 for alignment and bfactor with 1 or 0 for RMSD calculation
        
