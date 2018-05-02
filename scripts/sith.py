@@ -1092,7 +1092,7 @@ def build_metric_bias(parameters,clusters,metric_arr,iteration,metric_input,time
        if parameters['bias']=='LOWER_WALLS' or parameters['bias']=='UPPER_WALLS' or parameters['bias']=='RESTRAINT' or parameters['bias']=='MOVINGRESTRAINT_L':
           clusdist_avg=parameters['at_metric']
           kappa_metric=float(parameters['kappa_metric'])
-       if clusdist_avg="max" and 'TORSION' in parameters['metric']: 
+       if clusdist_avg=="max" and 'TORSION' in parameters['metric']: 
           max_dist=2*math.sqrt(len(metric_input.keys()))
           print max_dist
           sys.exit()
