@@ -193,9 +193,12 @@ def loadStructure(pdbfile,origin=None):
     Output: A datastructure that holds a pdb frame and (optional) a list with necessary parameters as bfactor
     """
     struc = mdtraj.load(pdbfile)
-    # Remove the water molecules unless the specifies otherwise
+    
+    # Leave the remove_solvent here as a reminder but do NOT use it because it fucks up the atom numbers!!!!
+    """
     if wat == 'yes': 
        struc=struc.remove_solvent()
+    """
     if origin=='fpocket':
        filein=open(pdbfile,'r')
        bfact=[]
@@ -427,7 +430,7 @@ def selectPolarApolar(frame, grid_min, grid_max, ligand=None,ligname=None):
     polar_list = []
     apolar_list = []
     for i in range(0,frame.n_atoms):
-        if frame.topology.atom(i).residue.name==ligname:
+        if frame.topology.atom(i).residue.name in [ligname,'HOH','WAT','SOL']:
            continue
         atcoord = frame.xyz[0][i]
         if (atcoord[0] > grid_min[0] and
