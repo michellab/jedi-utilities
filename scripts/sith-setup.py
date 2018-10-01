@@ -64,15 +64,33 @@ def getAtoms(apolar,polar,cv):
 def genCV(cv,plumed,cvlist):
     fileout=open(plumed,'w')
     if cv=="COM":
+       labels=[]
        for key in  cvlist.keys():
-          line='COM_'+str(key)+": COM ATOMS="+','.join(str(num) for num in cvlist[key])+'\n\n'
+          line='COM_'+str(key)+": COM ATOMS="+','.join(str(num) for num in cvlist[key])+'\n'
           fileout.write(line)
-    line='SITH ARG='+','.join('COM_'+str(key) for key in cvlist.keys())+\
-        " SITHSTRIDE=50000 SITHFILE=clusters.dat DC=0.01 DELTA0=0.05 CVSTRIDE=2500 CVFILE=cvs.dat TYPOT=LOWER_WALLS\n\n"
-    fileout.write(line)
-    line="PRINT ARG="+','.join('COM_'+str(key) for key in cvlist.keys())+" FILE=COLVAR STRIDE=2500"
-    fileout.write(line)
-    fileout.close()
+          labels.append('COM_'+str(key))
+       fileout.write('\n')
+       distance_labels=[]
+       for i in range(0,len(labels)):
+           label1=labels[i]
+           for j in range(i+1,len(labels)):
+               label2=labels[j] 
+               if label1==label2:
+                  continue
+               dislab='d_'+label1+'_'+label2
+               distance_labels.append(dislab)
+               line=dislab+': DISTANCE ATOMS='+label1+','+label2+'\n'
+               fileout.write(line)
+
+       fileout.write('\n')
+               
+       line='SITH ARG='+','.join(distance_labels)+\
+            " SITHSTRIDE=50000 SITHFILE=clusters.dat DC=0.01 DELTA0=0.05 CVSTRIDE=2500 CVFILE=cvs.dat TYPOT=LOWER_WALLS\n\n"
+       fileout.write(line)
+       line="PRINT ARG="+','.join(distance_labels)+" FILE=COLVAR STRIDE=2500"
+       fileout.write(line)
+       
+       fileout.close()
     
           
 
