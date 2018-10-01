@@ -65,10 +65,10 @@ def genCV(cv,plumed,cvlist):
     fileout=open(plumed,'w')
     if cv=="COM":
        for key in  cvlist.keys():
-          line='COM_'+str(key)+": COM ATOMS="+','.join(str(num) for num in cvlist[key])+'\n'
+          line='COM_'+str(key)+": COM ATOMS="+','.join(str(num) for num in cvlist[key])+'\n\n'
           fileout.write(line)
     line='SITH ARG='+','.join('COM_'+str(key) for key in cvlist.keys())+\
-        " SITHSTRIDE=50000 SITHFILE=clusters.dat DC=0.01 DELTA0=0.05 CVSTRIDE=2500 CVFILE=cvs.dat TYPOT=LOWER_WALLS"
+        " SITHSTRIDE=50000 SITHFILE=clusters.dat DC=0.01 DELTA0=0.05 CVSTRIDE=2500 CVFILE=cvs.dat TYPOT=LOWER_WALLS\n\n"
     fileout.write(line)
     line="PRINT ARG="+','.join('COM_'+str(key) for key in cvlist.keys())+" FILE=COLVAR STRIDE=2500"
     fileout.write(line)
