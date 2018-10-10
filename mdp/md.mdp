@@ -11,7 +11,7 @@ nstenergy	        = 0		; save energies
 nstlog		        = 500		; update log file
 compressed-x-grps   = System    ; replaces xtc-grps
 ; Bond parameters
-continuation	        = no		; Restarting after NPT 
+continuation	        = yes		; Restarting after NPT 
 constraint_algorithm    = lincs	    ; holonomic constraints 
 constraints	            = all-bonds	; all bonds (even heavy atom-H bonds) constrained
 lincs_iter	            = 1		    ; accuracy of LINCS
