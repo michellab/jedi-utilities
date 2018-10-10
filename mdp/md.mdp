@@ -42,4 +42,4 @@ pbc		= xyz		; 3-D PBC
 ; Dispersion correction
 DispCorr	= EnerPres	; account for cut-off vdW scheme
 ; Velocity generation
-gen_vel		= no		; Velocity generation is off 
+gen_vel		= yes		; Velocity generation is on (otherwise parallel simulations from same tpr will give the same output) 
