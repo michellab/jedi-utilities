@@ -1,0 +1,12 @@
+This example describes how to setup input files for a JEDI calculation. 
+Here we use as input an all-atom model of the protein structure of interest.
+We also have as input the coordinates of a ligand, and we wish to define a grid 
+region that covers the space occupied by the ligand. 
+
+The example is run by typing
+
+bash RUNME.sh
+
+This will generate three output files, apolar.pdb, polar.pdb and grid.pdb.
+
+This output can be compared to reference files that are in the folder reference output.

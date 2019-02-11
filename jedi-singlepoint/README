@@ -1,0 +1,5 @@
+This example executes a setup of a jedi calculation using a ligand to position the grid.
+This is followed by a single point calculation.
+The JEDI collective variable, grid coordinates and derivatives are computed. 
+The SITE keyword option was used to deactivate grid points that are far away from the SITE pdb file.
+

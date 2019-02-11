@@ -1,0 +1,133 @@
+Summary
+
+This document describes:
+* 1 how to compile a version of plumed2.2 that contains the JEDI collective variable.
+* 2 how to patch gromacs 5.1.0 with this version of plumed2
+* 3 how to download and complete a JEDI tutorial
+
+1 how to compile a version of plumed2.2 that contains the JEDI collective variable.
+
+cd ~/software/devel
+git clone https://github.com/michellab/plumed2
+cd plumed2
+./configure --prefix=/home/$USER/local/
+make install -j 8
+
+Verify that the code has been installed properly
+
+[ julien@mechagodzilla: ~/software/devel/plumed2 ]$ plumed -h
+Usage: plumed [options] [command] [command options]
+  plumed [command] -h|--help: to print help for a specific command
+(….)
+
+2 how to patch gromacs 5.1.0 with this version of plumed2
+
+First install gromacs
+
+cd ~/software
+wget ftp://ftp.gromacs.org/pub/gromacs/gromacs-5.1.tar.gz
+tar -xvf gromacs-5.1.tar.gz
+cd gromacs-5.1
+mkdir build
+ cd build
+cmake .. -DGMX_BUILD_OWN_FFTW=ON -DCMAKE_INSTALL_PREFIX=/home/$USER/local/gromacs
+ make -j 8
+ make install
+
+Now edit your .bashrc or .bash_aliases file and add
+source /home/$USER/local/gromacs/bin/GMXRC
+
+Now patch gromacs
+
+cd ~/software/gromacs-5.1
+plumed patch -p --shared
+
+Choose option 5
+
+cd build
+make install
+
+Verify that the plumed library is linked to your gromacs executable
+
+[ julien@mechagodzilla: ~/software/thirdparty/gromacs-5.1/build ]$ ldd /home/julien/local/gromacs/bin/mdrun
+linux-vdso.so.1 =>  (0x00007fffe35d6000)
+libgromacs.so.1 => /home/julien/local/gromacs/bin/../lib/x86_64-linux-gnu/libgromacs.so.1 (0x00007fe5c68e0000)
+libplumed.so => /home/julien/local/lib/libplumed.so (0x00007fe5c61dc000)
+(…)
+
+3 How to do the JEDI tutorial
+
+cd ~/projects
+#Checkout the jedi tutorial files
+git command here
+
+Study each example in the order below.
+
+jedi-setup-ligand
+
+Run the example
+Visualise the output files apolar.pdb polar.pdb and grid.pdb
+Vary the input parameter -c to see how the output changes.
+
+jedi-setup-region
+
+Run the example
+Visualise the output files apolar.pdb polar.pdb and grid.pdb
+Vary the contents of the input file region.dim to see how the output changes.
+
+jedi-singlepoint
+
+Run the example
+
+Inspect the contents of the input file jedi.params.
+
+Inspect the contents of the output file jedi_stats.dat
+
+#step      JEDI      Vdrug_like      Va      Ha      MaxDerivIdx      max_deriv_x      max_deriv_y      max_deriv_z      MaxDerivIdx_*      max_deriv_x*      max_deriv_y*      max_deriv_z*      rmsd
+0 6.7345 1 0.32953 0.75647 890 -0.88325 1.2764 0.6963 890 -0.85951 1.242 0.69877 0.0017891
+
+The first number indicates the calculation was done at step 0
+The second number is the JEDI score
+The third number is the value of the Vdrug_like descriptor
+The fourth number is the value of the Va descriptor
+The fifth number is the value of the Ha descriptor
+The next number is the index of the CV atom that has the JEDI derivatives with the highest norm. The derivatives are the next three number.
+The next four numbers are the index and derivatives of the CV atom with the largest derivatives after removal of net force and torque.
+
+Visualise the file grid-step-0.dx with VMD
+Visualise the protein input structure.
+The grid is overlaid onto the binding site region.
+Change the contours levels to select grid points that have activity values above/below a certain threshold. Grid points with high activity values should be more frequently found in pockets.
+
+Study the file derivatives-step-0.xyz
+The first number is the index of the atom  during the CV calculation. The second number is the index of the atom in the input pdb file. The next three numbers are the derivatives of JEDI with respect to a change in the x/y/z component of the Cartesian coordinates of that atom.
+
+jedi-implicit-monitor
+
+Run the example
+Inspect the contents of the input file plumed.dat
+Inspect the contents of the output file jedi_stats.dat
+Plot the evolution of the JEDI score as a function of the number of steps.
+Plot Va and Ha vs step and check how fluctuations in Va/Ha change the values of JEDI
+Visualise different grid-step-*.dx files. Observe how the position of the grid changes with time.
+Visualise the trajectory stored in md.xtc. Map snapshots of your trajectory with their respective grid-step-*.dx file.
+Inspect how the derivatives on one atom fluctuate with time by analysing the contents of derivatives-step*.xyz
+
+jedi-implicit-biasUS
+
+Run the example
+Inspect the contents of the input file plumed.dat
+Inspect the contents of the output file jedi_stats.dat
+Plot the evolution of the JEDI score as a function of the number of steps.
+
+Check whether you see a difference in average JEDI value with respect to jodi-implicit-monitor.
+What average value do you expect? Is the output consistent with your expectations? If no what could be the reasons?
+
+jedi-explicit-monitor and jedi-implicit-biasUS
+
+Perform a similar analysis on the explicit solvent setups.
+
+jedi-explicit-monitor-opt and jedi-explicit-biasUS-opt
+
+Study how the file RUNME.sh differ from the previous examples.
+Compare the performance of the code (ns/day) between the two setups. Why is there a difference in speed?

@@ -1,0 +1,107 @@
+* Force Field Parameter File.
+* 
+
+BOND
+br ca  262.70   1.908
+ca ca  461.10   1.398
+ca oh  384.00   1.364
+ho oh  371.40   0.973
+ca ha  345.80   1.086
+c  ca  345.90   1.491
+c  o   637.70   1.218
+c  cc  371.00   1.468
+cc cd  500.90   1.373
+ca cc  385.10   1.456
+c3 cd  334.80   1.502
+cd os  386.10   1.362
+c3 c3  300.90   1.538
+c3 hc  330.60   1.097
+ca os  376.60   1.370
+ca sy  243.40   1.791
+o  sy  493.00   1.466
+n3 sy  297.40   1.696
+c3 n3  325.90   1.465
+c3 h1  330.60   1.097
+
+ANGLE
+br ca ca   62.780     119.300
+ca ca oh   69.520     119.900
+ca ca ca   66.620     120.020
+ca ca ha   48.180     119.880
+ca oh ho   49.000     108.580
+ca ca c    64.280     120.330
+ca c  o    68.720     122.600
+ca c  cc   64.060     116.000
+c  cc cd   65.090     121.350
+c  cc ca   62.970     122.950
+o  c  cc   69.140     123.930
+cc cd c3   64.710     119.450
+cc cd os   70.110     120.300
+cc ca ca   65.020     120.790
+cd cc ca   67.620     113.510
+cd c3 c3   63.470     111.930
+cd c3 hc   47.180     110.490
+cd os ca   65.540     113.080
+c3 cd os   67.640     116.800
+c3 c3 hc   46.340     109.800
+ca ca os   69.580     119.200
+ca ca sy   61.480     119.420
+ca sy o    65.770     108.350
+ca sy n3   63.980     102.440
+sy n3 c3   62.510     115.250
+o  sy o    72.540     121.410
+o  sy n3   70.440     107.130
+n3 c3 h1   49.530     109.880
+c3 n3 c3   63.820     112.350
+hc c3 hc   39.400     107.580
+h1 c3 h1   39.240     108.460
+
+DIHEDRAL
+X  ca ca X      3.625         2     180.0
+X  ca oh X      0.900         2     180.0
+X  c  ca X      1.000         2     180.0
+X  c  cc X      2.875         2     180.0
+X  cc cd X      4.000         2     180.0
+c  cc ca ca     0.700         2     180.0      ! same as X  c2 ca X 
+cd cc ca ca     0.700         2     180.0      ! same as X  c2 ca X 
+X  c3 cd X      0.000         3       0.0
+cc cd os ca     1.050         2     180.0      ! same as X  c2 os X 
+c3 cd os ca     1.050         2     180.0      ! same as X  c2 os X 
+X  c3 c3 X      0.156         3       0.0
+hc c3 c3 hc     0.150         3       0.0
+X  ca os X      0.900         2     180.0
+X  ca sy X      1.300         2     180.0
+X  n3 sy X      3.133         2       0.0
+X  c3 n3 X      0.300         3       0.0
+
+IMPHI
+br ca ca ca     1.100         2     180.0
+ca ca ca oh     1.100         2     180.0	! Using default value
+X  X  ca ha     1.100         2     180.0
+c  ca ca ca     1.100         2     180.0	! Using default value
+X  X  c  o     10.500         2     180.0
+c  ca cc cd     1.100         2     180.0	! Using default value
+c3 cc cd os     1.100         2     180.0	! Using default value
+ca ca ca cc     1.100         2     180.0	! Using default value
+ca ca ca os     1.100         2     180.0	! Using default value
+ca ca ca sy     1.100         2     180.0	! Using default value
+
+NONBONDED  NBXMOD 5  GROUP SWITCH CDIEL -
+CUTNB 14.0  CTOFNB 12.0  CTONNB 10.0  EPS 1.0  E14FAC 0.83333333  WMIN 1.4
+!                Emin     Rmin/2              Emin/2     Rmin  (for 1-4's)
+!             (kcal/mol)    (A)
+br      0.00   -0.4200    2.0200      0.00   -0.2100    2.0200
+ca      0.00   -0.0860    1.9080      0.00   -0.0430    1.9080
+oh      0.00   -0.2104    1.7210      0.00   -0.1052    1.7210
+ c      0.00   -0.0860    1.9080      0.00   -0.0430    1.9080
+ o      0.00   -0.2100    1.6612      0.00   -0.1050    1.6612
+cc      0.00   -0.0860    1.9080      0.00   -0.0430    1.9080
+cd      0.00   -0.0860    1.9080      0.00   -0.0430    1.9080
+c3      0.00   -0.1094    1.9080      0.00   -0.0547    1.9080
+os      0.00   -0.1700    1.6837      0.00   -0.0850    1.6837
+sy      0.00   -0.2500    2.0000      0.00   -0.1250    2.0000
+n3      0.00   -0.1700    1.8240      0.00   -0.0850    1.8240
+ho      0.00   -0.0000    0.0000      0.00   -0.0000    0.0000
+ha      0.00   -0.0150    1.4590      0.00   -0.0075    1.4590
+hc      0.00   -0.0157    1.4870      0.00   -0.0078    1.4870
+h1      0.00   -0.0157    1.3870      0.00   -0.0078    1.3870
