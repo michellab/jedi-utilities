@@ -1,0 +1,2 @@
+je: JEDI APOLAR=apolar.pdb POLAR=polar.pdb GRID=grid.pdb SITE=probe_2a_nobond.pdb PARAMETERS=jedi.params STRIDE=1 SUMMARY=jedi_stats_14800.dat GRIDSTRIDE=1 SIGMA=0.05 DUMPDERIVATIVES=0
+PRINT ARG=je STRIDE=1 FILE=DRIVER

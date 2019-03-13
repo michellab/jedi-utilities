@@ -1,0 +1,37 @@
+;
+;	File 'protein_Ion2.itp' was generated
+;	By user: jjuarez (1001)
+;	On host: godzilla
+;	At date: Wed Mar 13 11:37:39 2019
+
+;
+;	This is a include topology file
+;
+;	Created by:
+;	                 :-) GROMACS - gmx pdb2gmx, VERSION 5.1.4 (-:
+;	
+;	Executable:   /home/jjuarez/local/gromacs/bin/gmxserial
+;	Data prefix:  /home/jjuarez/local/gromacs
+;	Command line:
+;	  gmxserial pdb2gmx -f protein.pdb -o protein.gro -p protein.top -ff amber99sb-ildn -water tip3p -ignh
+;	Force field was read from the standard GROMACS share directory.
+;
+
+[ moleculetype ]
+; Name            nrexcl
+Ion2                3
+
+[ atoms ]
+;   nr       type  resnr residue  atom   cgnr     charge       mass  typeB    chargeB      massB
+; residue 6664 NA  rtp NA   q +1.0
+     1         Na   6664     NA     NA      1          1      22.99   ; qtot 1
+; residue 6665 NA  rtp NA   q +1.0
+     2         Na   6665     NA     NA      2          1      22.99   ; qtot 2
+; residue 6666 NA  rtp NA   q +1.0
+     3         Na   6666     NA     NA      3          1      22.99   ; qtot 3
+
+; Include Position restraint file
+#ifdef POSRES
+#include "posre_Ion2.itp"
+#endif
+

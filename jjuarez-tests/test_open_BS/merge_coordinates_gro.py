@@ -1,0 +1,1 @@
+../../scripts/merge_coordinates_gro.py
