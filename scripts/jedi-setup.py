@@ -149,38 +149,38 @@ ERROR ! The specified input region file cannot be found. See usage above.
 
     if args.fpocket is not None:
        if not os.path.isfile(args.fpocket):
-          print "File "+args.fpocket+" could not be found. Exiting"
+          print ("File "+args.fpocket+" could not be found. Exiting")
           sys.exit()
-       print "Grid and binding site are going to be generated from fpocket alpha spheres from file "+args.fpocket
+       print ("Grid and binding site are going to be generated from fpocket alpha spheres from file "+args.fpocket)
 
 
     # Inform the user of whether water oxygens are omitted or not
     if (args.ignore_waters is None) or (args.ignore_waters == "yes"):
-       print "Water oxygens are going to be ignored"
+       print ("Water oxygens are going to be ignored")
     elif args.ignore_waters == "no":
-       print "Water oxygens are NOT going to be ignored"
+       print ("Water oxygens are NOT going to be ignored")
     else:
-       print """@@@
+       print ("""@@@
 ERROR ! The -w flag can only have "yes" or "no". Default is "yes".
-@@@"""
+@@@""")
        sys.exit(-1)
 
     # Inform the user of whether the grid is going to be cropped or not
     if not (args.crop is None or args.crop == "yes" or args.crop=="no"):
-       print """@@@
+       print ("""@@@
 ERROR ! The -k flag can only have "yes" or "no". Default is "yes".
-@@@"""
+@@@""")
        sys.exit(-1)
        
     elif ((args.crop is None) or (args.crop == "yes")) and (args.full=="no") and args.ligand is not None:
-       print "The grid points further than ", args.cutoff, " nm from the ligand are going to be deleted."
+       print ("The grid points further than ", args.cutoff, " nm from the ligand are going to be deleted.")
     elif (args.crop == "no") and (args.full=="no"):
-       print "All grid points are going to be kept."
+       print ("All grid points are going to be kept.")
     elif args.full=="yes":
-       print "Overlapping a grid onto the whole protein"
+       print ("Overlapping a grid onto the whole protein")
 
     if args.full=="yes":
-       print "The grid is going to overlap the whole protein"
+       print ("The grid is going to overlap the whole protein")
    
     print (args)
     return args.input, args.ligand, float(args.cutoff), args.region, float(args.spacing),\
@@ -585,17 +585,17 @@ if __name__ == '__main__':
         region=None
         fpocket=None
     else:
-        print "Something went wrong. Check the code."
+        print ("Something went wrong. Check the code.")
         sys.exit()
     # construct alignment
     #alignment, alignment_indices = selectAlignment(system, rule="backbone")
     # construct grid, polar and apolar
-    print "System ", system
+    print ("System "), system
     if full=="no":
-       print "ligand ", ligand
-       print "lig_cutoff ", lig_cutoff
-       print "region: ", region, " Type ", type(region)
-    print "spacing ", spacing
+       print ("ligand "), ligand
+       print ("lig_cutoff "), lig_cutoff
+       print ("region: "), region, " Type ", type(region)
+    print ("spacing "), spacing
     #sys.exit("This is just a test, modifications done between line 367 and this point")
     grid_data = defineGrid(system,full,ligand=ligand, lig_cutoff=lig_cutoff,\
                                    region=region, spacing=spacing,fpocket=fpocket,bfact=bfact)

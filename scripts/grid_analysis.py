@@ -50,21 +50,21 @@ ERROR ! You must specificy an xyz grid file and an input_activities file. See us
         sys.exit(0)
 
      if not os.path.isfile(args.input_grid):
-        print help_message
+        print (help_message)
         print ("""@@@
 ERROR ! The input grid xyz file cannot be found. See usage above.
 @@@""")
         sys.exit(-1)
 
      if not os.path.isfile(args.input_activities):
-        print help_message
+        print (help_message)
         print ("""@@@
 ERROR ! The input_activities file cannot be found. See usage above.
 @@@""")
         sys.exit(-1)
 
      if args.output_grid is None:
-        print help_message
+        print (help_message)
         print ("""@@@
 ERROR ! Grid output file must be specified. See usage above.
 @@@""")
@@ -72,11 +72,11 @@ ERROR ! Grid output file must be specified. See usage above.
 
      if args.crop is None or args.crop=="yes":
         args.crop="yes"
-        print "grid points with activity 0 are going to be ignored" 
+        print ("grid points with activity 0 are going to be ignored") 
      elif args.crop=="no":
-        print "Keeping all grid points"
+        print ("Keeping all grid points")
      else:
-        print 'the -k/--crop flag only accepts "yes" or "no. Default is "yes".'
+        print ('the -k/--crop flag only accepts "yes" or "no. Default is "yes".')
 
      return args.input_grid, args.input_activities, args.output_grid, args.crop
 
@@ -141,7 +141,7 @@ def outputPdb(grid_object,activities,output_grid):
     return 0
 
 if __name__ == '__main__':
-   print help_message 
+   print (help_message) 
    input_grid,input_activities,output_grid,crop=parse(parser)
    coords,num_points=getGridCoordinates(input_grid)
    activities=getActivities(input_activities)
