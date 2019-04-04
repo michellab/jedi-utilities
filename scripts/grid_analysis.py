@@ -113,7 +113,7 @@ def getGridObject(coords,activities,num_points):
     hydrogen = mdtraj.element.hydrogen
     for i in range(0,num_points):
         #top.add_atom("GRI", germanium, residue)
-	top.add_atom("GRI", hydrogen, residue) # JJJ modification to visualize the grid as non bonded atoms
+       top.add_atom("GRI", hydrogen, residue) # JJJ modification to visualize the grid as non bonded atoms
     xyz = numpy.array(coords)
     grid_object = mdtraj.Trajectory(xyz, top)
     return grid_object
@@ -131,10 +131,10 @@ def outputPdb(grid_object,activities,output_grid):
               continue
            activity_pdb='{0:.2f}'.format(activities[activities_index]) #Occuppancies in pdb files only have 2 decimals
            myline=line.replace('A   0','A%4d'%i)# JJJ modification to visualize the grid as non bonded atoms
-	   new_line=myline[0:56]+str(activity_pdb)+myline[60:]
+           new_line=myline[0:56]+str(activity_pdb)+myline[60:]
            outfile.write(new_line)
            outfile.write("TER\n") # JJJ modification to visualize the grid as non bonded atoms
-	   i = i + 1 #JJJ modification to visualize the grid as non bonded atoms
+           i = i + 1 #JJJ modification to visualize the grid as non bonded atoms
     tempfile.close()
 #    os.system('rm temp.pdb')
     outfile.close()

@@ -1,0 +1,2 @@
+je: JEDI APOLAR=apolar_initial.pdb POLAR=polar_initial.pdb GRID=grid_initial.pdb SITE=XXXX PARAMETERS=../jedi.params STRIDE=1 SUMMARY=jedi_stats_initial.dat GRIDSTRIDE=1 SIGMA=0.05 DUMPDERIVATIVES=0
+PRINT ARG=je STRIDE=1 FILE=DRIVER_initial

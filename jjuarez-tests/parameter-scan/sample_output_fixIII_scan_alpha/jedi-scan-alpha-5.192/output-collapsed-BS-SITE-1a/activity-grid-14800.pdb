@@ -1,0 +1,372 @@
+ATOM    242  GRI GRI A   1      41.894  53.841  21.042  0.00  0.00          H   
+TER
+ATOM    243  GRI GRI A   2      41.894  53.841  22.542  0.02  0.00          H   
+TER
+ATOM    250  GRI GRI A   3      41.894  55.341  21.042  0.02  0.00          H   
+TER
+ATOM    251  GRI GRI A   4      41.894  55.341  22.542  0.23  0.00          H   
+TER
+ATOM    252  GRI GRI A   5      41.894  55.341  24.042  0.05  0.00          H   
+TER
+ATOM    259  GRI GRI A   6      41.894  56.841  21.042  0.00  0.00          H   
+TER
+ATOM    262  GRI GRI A   7      41.894  56.841  25.542  0.00  0.00          H   
+TER
+ATOM    271  GRI GRI A   8      41.894  58.341  25.542  0.00  0.00          H   
+TER
+ATOM    280  GRI GRI A   9      41.894  59.841  25.542  0.00  0.00          H   
+TER
+ATOM    288  GRI GRI A  10      41.894  61.341  24.042  0.05  0.00          H   
+TER
+ATOM    293  GRI GRI A  11      41.894  62.841  19.542  0.00  0.00          H   
+TER
+ATOM    294  GRI GRI A  12      41.894  62.841  21.042  0.03  0.00          H   
+TER
+ATOM    295  GRI GRI A  13      41.894  62.841  22.542  0.01  0.00          H   
+TER
+ATOM    323  GRI GRI A  14      43.394  52.341  21.042  0.00  0.00          H   
+TER
+ATOM    324  GRI GRI A  15      43.394  52.341  22.542  0.00  0.00          H   
+TER
+ATOM    332  GRI GRI A  16      43.394  53.841  22.542  0.14  0.00          H   
+TER
+ATOM    333  GRI GRI A  17      43.394  53.841  24.042  0.02  0.00          H   
+TER
+ATOM    340  GRI GRI A  18      43.394  55.341  22.542  0.60  0.00          H   
+TER
+ATOM    341  GRI GRI A  19      43.394  55.341  24.042  0.14  0.00          H   
+TER
+ATOM    342  GRI GRI A  20      43.394  55.341  25.542  0.01  0.00          H   
+TER
+ATOM    344  GRI GRI A  21      43.394  56.841  15.042  0.01  0.00          H   
+TER
+ATOM    348  GRI GRI A  22      43.394  56.841  21.042  0.21  0.00          H   
+TER
+ATOM    349  GRI GRI A  23      43.394  56.841  22.542  0.01  0.00          H   
+TER
+ATOM    350  GRI GRI A  24      43.394  56.841  24.042  0.31  0.00          H   
+TER
+ATOM    351  GRI GRI A  25      43.394  56.841  25.542  0.06  0.00          H   
+TER
+ATOM    355  GRI GRI A  26      43.394  58.341  18.042  0.36  0.00          H   
+TER
+ATOM    356  GRI GRI A  27      43.394  58.341  19.542  0.01  0.00          H   
+TER
+ATOM    360  GRI GRI A  28      43.394  58.341  25.542  0.12  0.00          H   
+TER
+ATOM    369  GRI GRI A  29      43.394  59.841  25.542  0.07  0.00          H   
+TER
+ATOM    377  GRI GRI A  30      43.394  61.341  22.542  0.01  0.00          H   
+TER
+ATOM    378  GRI GRI A  31      43.394  61.341  24.042  0.37  0.00          H   
+TER
+ATOM    379  GRI GRI A  32      43.394  61.341  25.542  0.03  0.00          H   
+TER
+ATOM    382  GRI GRI A  33      43.394  62.841  16.542  0.00  0.00          H   
+TER
+ATOM    386  GRI GRI A  34      43.394  62.841  22.542  0.02  0.00          H   
+TER
+ATOM    387  GRI GRI A  35      43.394  62.841  24.042  0.03  0.00          H   
+TER
+ATOM    388  GRI GRI A  36      43.394  62.841  25.542  0.00  0.00          H   
+TER
+ATOM    415  GRI GRI A  37      44.894  52.341  21.042  0.00  0.00          H   
+TER
+ATOM    416  GRI GRI A  38      44.894  52.341  22.542  0.00  0.00          H   
+TER
+ATOM    419  GRI GRI A  39      44.894  53.841  16.542  0.00  0.00          H   
+TER
+ATOM    423  GRI GRI A  40      44.894  53.841  22.542  0.10  0.00          H   
+TER
+ATOM    424  GRI GRI A  41      44.894  53.841  24.042  0.00  0.00          H   
+TER
+ATOM    426  GRI GRI A  42      44.894  55.341  15.042  0.03  0.00          H   
+TER
+ATOM    427  GRI GRI A  43      44.894  55.341  16.542  0.15  0.00          H   
+TER
+ATOM    431  GRI GRI A  44      44.894  55.341  22.542  0.04  0.00          H   
+TER
+ATOM    435  GRI GRI A  45      44.894  56.841  15.042  0.09  0.00          H   
+TER
+ATOM    436  GRI GRI A  46      44.894  56.841  16.542  0.65  0.00          H   
+TER
+ATOM    445  GRI GRI A  47      44.894  58.341  15.042  0.14  0.00          H   
+TER
+ATOM    446  GRI GRI A  48      44.894  58.341  16.542  0.71  0.00          H   
+TER
+ATOM    450  GRI GRI A  49      44.894  58.341  22.542  0.00  0.00          H   
+TER
+ATOM    451  GRI GRI A  50      44.894  58.341  24.042  0.01  0.00          H   
+TER
+ATOM    455  GRI GRI A  51      44.894  59.841  15.042  0.01  0.00          H   
+TER
+ATOM    456  GRI GRI A  52      44.894  59.841  16.542  0.23  0.00          H   
+TER
+ATOM    461  GRI GRI A  53      44.894  59.841  24.042  0.13  0.00          H   
+TER
+ATOM    462  GRI GRI A  54      44.894  59.841  25.542  0.01  0.00          H   
+TER
+ATOM    466  GRI GRI A  55      44.894  61.341  16.542  0.09  0.00          H   
+TER
+ATOM    479  GRI GRI A  56      44.894  62.841  22.542  0.00  0.00          H   
+TER
+ATOM    498  GRI GRI A  57      46.394  50.841  19.542  0.00  0.00          H   
+TER
+ATOM    502  GRI GRI A  58      46.394  52.341  16.542  0.00  0.00          H   
+TER
+ATOM    503  GRI GRI A  59      46.394  52.341  18.042  0.03  0.00          H   
+TER
+ATOM    504  GRI GRI A  60      46.394  52.341  19.542  0.06  0.00          H   
+TER
+ATOM    505  GRI GRI A  61      46.394  52.341  21.042  0.01  0.00          H   
+TER
+ATOM    506  GRI GRI A  62      46.394  52.341  22.542  0.00  0.00          H   
+TER
+ATOM    508  GRI GRI A  63      46.394  53.841  15.042  0.00  0.00          H   
+TER
+ATOM    509  GRI GRI A  64      46.394  53.841  16.542  0.13  0.00          H   
+TER
+ATOM    510  GRI GRI A  65      46.394  53.841  18.042  0.23  0.00          H   
+TER
+ATOM    511  GRI GRI A  66      46.394  53.841  19.542  0.40  0.00          H   
+TER
+ATOM    512  GRI GRI A  67      46.394  53.841  21.042  0.32  0.00          H   
+TER
+ATOM    513  GRI GRI A  68      46.394  53.841  22.542  0.03  0.00          H   
+TER
+ATOM    514  GRI GRI A  69      46.394  53.841  24.042  0.00  0.00          H   
+TER
+ATOM    515  GRI GRI A  70      46.394  55.341  15.042  0.04  0.00          H   
+TER
+ATOM    519  GRI GRI A  71      46.394  55.341  21.042  0.00  0.00          H   
+TER
+ATOM    523  GRI GRI A  72      46.394  55.341  27.042  0.00  0.00          H   
+TER
+ATOM    525  GRI GRI A  73      46.394  56.841  15.042  0.00  0.00          H   
+TER
+ATOM    526  GRI GRI A  74      46.394  56.841  16.542  0.00  0.00          H   
+TER
+ATOM    535  GRI GRI A  75      46.394  58.341  15.042  0.00  0.00          H   
+TER
+ATOM    536  GRI GRI A  76      46.394  58.341  16.542  0.86  0.00          H   
+TER
+ATOM    545  GRI GRI A  77      46.394  59.841  15.042  0.35  0.00          H   
+TER
+ATOM    546  GRI GRI A  78      46.394  59.841  16.542  0.82  0.00          H   
+TER
+ATOM    555  GRI GRI A  79      46.394  61.341  15.042  0.00  0.00          H   
+TER
+ATOM    556  GRI GRI A  80      46.394  61.341  16.542  0.66  0.00          H   
+TER
+ATOM    596  GRI GRI A  81      47.894  52.341  16.542  0.00  0.00          H   
+TER
+ATOM    597  GRI GRI A  82      47.894  52.341  18.042  0.00  0.00          H   
+TER
+ATOM    598  GRI GRI A  83      47.894  52.341  19.542  0.00  0.00          H   
+TER
+ATOM    599  GRI GRI A  84      47.894  52.341  21.042  0.00  0.00          H   
+TER
+ATOM    601  GRI GRI A  85      47.894  53.841  15.042  0.00  0.00          H   
+TER
+ATOM    602  GRI GRI A  86      47.894  53.841  16.542  0.00  0.00          H   
+TER
+ATOM    605  GRI GRI A  87      47.894  53.841  21.042  0.15  0.00          H   
+TER
+ATOM    606  GRI GRI A  88      47.894  53.841  22.542  0.04  0.00          H   
+TER
+ATOM    607  GRI GRI A  89      47.894  53.841  24.042  0.00  0.00          H   
+TER
+ATOM    608  GRI GRI A  90      47.894  53.841  25.542  0.00  0.00          H   
+TER
+ATOM    609  GRI GRI A  91      47.894  55.341  15.042  0.00  0.00          H   
+TER
+ATOM    616  GRI GRI A  92      47.894  55.341  25.542  0.02  0.00          H   
+TER
+ATOM    619  GRI GRI A  93      47.894  56.841  15.042  0.00  0.00          H   
+TER
+ATOM    629  GRI GRI A  94      47.894  58.341  15.042  0.11  0.00          H   
+TER
+ATOM    638  GRI GRI A  95      47.894  59.841  13.542  0.00  0.00          H   
+TER
+ATOM    639  GRI GRI A  96      47.894  59.841  15.042  0.41  0.00          H   
+TER
+ATOM    640  GRI GRI A  97      47.894  59.841  16.542  0.02  0.00          H   
+TER
+ATOM    649  GRI GRI A  98      47.894  61.341  15.042  0.27  0.00          H   
+TER
+ATOM    650  GRI GRI A  99      47.894  61.341  16.542  0.73  0.00          H   
+TER
+ATOM    656  GRI GRI A 100      47.894  61.341  25.542  0.16  0.00          H   
+TER
+ATOM    660  GRI GRI A 101      47.894  62.841  16.542  0.00  0.00          H   
+TER
+ATOM    661  GRI GRI A 102      47.894  62.841  18.042  0.00  0.00          H   
+TER
+ATOM    673  GRI GRI A 103      47.894  64.341  21.042  0.04  0.00          H   
+TER
+ATOM    696  GRI GRI A 104      49.394  53.841  21.042  0.03  0.00          H   
+TER
+ATOM    697  GRI GRI A 105      49.394  53.841  22.542  0.02  0.00          H   
+TER
+ATOM    698  GRI GRI A 106      49.394  53.841  24.042  0.01  0.00          H   
+TER
+ATOM    704  GRI GRI A 107      49.394  55.341  22.542  0.72  0.00          H   
+TER
+ATOM    705  GRI GRI A 108      49.394  55.341  24.042  0.52  0.00          H   
+TER
+ATOM    706  GRI GRI A 109      49.394  55.341  25.542  0.01  0.00          H   
+TER
+ATOM    714  GRI GRI A 110      49.394  56.841  24.042  0.00  0.00          H   
+TER
+ATOM    715  GRI GRI A 111      49.394  56.841  25.542  0.00  0.00          H   
+TER
+ATOM    717  GRI GRI A 112      49.394  58.341  13.542  0.00  0.00          H   
+TER
+ATOM    718  GRI GRI A 113      49.394  58.341  15.042  0.04  0.00          H   
+TER
+ATOM    727  GRI GRI A 114      49.394  59.841  13.542  0.00  0.00          H   
+TER
+ATOM    728  GRI GRI A 115      49.394  59.841  15.042  0.00  0.00          H   
+TER
+ATOM    729  GRI GRI A 116      49.394  59.841  16.542  0.39  0.00          H   
+TER
+ATOM    735  GRI GRI A 117      49.394  59.841  25.542  0.46  0.00          H   
+TER
+ATOM    736  GRI GRI A 118      49.394  59.841  27.042  0.00  0.00          H   
+TER
+ATOM    739  GRI GRI A 119      49.394  61.341  15.042  0.16  0.00          H   
+TER
+ATOM    740  GRI GRI A 120      49.394  61.341  16.542  0.41  0.00          H   
+TER
+ATOM    744  GRI GRI A 121      49.394  61.341  22.542  0.00  0.00          H   
+TER
+ATOM    745  GRI GRI A 122      49.394  61.341  24.042  0.91  0.00          H   
+TER
+ATOM    746  GRI GRI A 123      49.394  61.341  25.542  0.47  0.00          H   
+TER
+ATOM    750  GRI GRI A 124      49.394  62.841  15.042  0.01  0.00          H   
+TER
+ATOM    751  GRI GRI A 125      49.394  62.841  16.542  0.14  0.00          H   
+TER
+ATOM    754  GRI GRI A 126      49.394  62.841  21.042  0.01  0.00          H   
+TER
+ATOM    757  GRI GRI A 127      49.394  62.841  25.542  0.09  0.00          H   
+TER
+ATOM    763  GRI GRI A 128      49.394  64.341  19.542  0.00  0.00          H   
+TER
+ATOM    764  GRI GRI A 129      49.394  64.341  21.042  0.53  0.00          H   
+TER
+ATOM    786  GRI GRI A 130      50.894  53.841  24.042  0.00  0.00          H   
+TER
+ATOM    791  GRI GRI A 131      50.894  55.341  24.042  0.31  0.00          H   
+TER
+ATOM    793  GRI GRI A 132      50.894  56.841  15.042  0.03  0.00          H   
+TER
+ATOM    798  GRI GRI A 133      50.894  56.841  22.542  0.68  0.00          H   
+TER
+ATOM    799  GRI GRI A 134      50.894  56.841  24.042  0.00  0.00          H   
+TER
+ATOM    808  GRI GRI A 135      50.894  58.341  22.542  1.00  0.00          H   
+TER
+ATOM    818  GRI GRI A 136      50.894  59.841  22.542  0.98  0.00          H   
+TER
+ATOM    819  GRI GRI A 137      50.894  59.841  24.042  0.83  0.00          H   
+TER
+ATOM    820  GRI GRI A 138      50.894  59.841  25.542  0.00  0.00          H   
+TER
+ATOM    821  GRI GRI A 139      50.894  59.841  27.042  0.02  0.00          H   
+TER
+ATOM    828  GRI GRI A 140      50.894  61.341  21.042  0.00  0.00          H   
+TER
+ATOM    829  GRI GRI A 141      50.894  61.341  22.542  0.69  0.00          H   
+TER
+ATOM    830  GRI GRI A 142      50.894  61.341  24.042  0.28  0.00          H   
+TER
+ATOM    831  GRI GRI A 143      50.894  61.341  25.542  0.13  0.00          H   
+TER
+ATOM    832  GRI GRI A 144      50.894  61.341  27.042  0.00  0.00          H   
+TER
+ATOM    840  GRI GRI A 145      50.894  62.841  22.542  0.32  0.00          H   
+TER
+ATOM    841  GRI GRI A 146      50.894  62.841  24.042  0.14  0.00          H   
+TER
+ATOM    842  GRI GRI A 147      50.894  62.841  25.542  0.00  0.00          H   
+TER
+ATOM    850  GRI GRI A 148      50.894  64.341  22.542  0.21  0.00          H   
+TER
+ATOM    851  GRI GRI A 149      50.894  64.341  24.042  0.01  0.00          H   
+TER
+ATOM    874  GRI GRI A 150      52.394  55.341  24.042  0.11  0.00          H   
+TER
+ATOM    876  GRI GRI A 151      52.394  56.841  16.542  0.01  0.00          H   
+TER
+ATOM    880  GRI GRI A 152      52.394  56.841  22.542  0.00  0.00          H   
+TER
+ATOM    886  GRI GRI A 153      52.394  58.341  18.042  0.11  0.00          H   
+TER
+ATOM    896  GRI GRI A 154      52.394  59.841  18.042  0.11  0.00          H   
+TER
+ATOM    897  GRI GRI A 155      52.394  59.841  19.542  0.64  0.00          H   
+TER
+ATOM    898  GRI GRI A 156      52.394  59.841  21.042  0.01  0.00          H   
+TER
+ATOM    899  GRI GRI A 157      52.394  59.841  22.542  0.82  0.00          H   
+TER
+ATOM    900  GRI GRI A 158      52.394  59.841  24.042  0.07  0.00          H   
+TER
+ATOM    909  GRI GRI A 159      52.394  61.341  22.542  0.25  0.00          H   
+TER
+ATOM    910  GRI GRI A 160      52.394  61.341  24.042  0.11  0.00          H   
+TER
+ATOM    911  GRI GRI A 161      52.394  61.341  25.542  0.00  0.00          H   
+TER
+ATOM    919  GRI GRI A 162      52.394  62.841  22.542  0.14  0.00          H   
+TER
+ATOM    920  GRI GRI A 163      52.394  62.841  24.042  0.01  0.00          H   
+TER
+ATOM    921  GRI GRI A 164      52.394  62.841  25.542  0.00  0.00          H   
+TER
+ATOM    928  GRI GRI A 165      52.394  64.341  22.542  0.01  0.00          H   
+TER
+ATOM    929  GRI GRI A 166      52.394  64.341  24.042  0.00  0.00          H   
+TER
+ATOM    946  GRI GRI A 167      53.894  55.341  18.042  0.00  0.00          H   
+TER
+ATOM    969  GRI GRI A 168      53.894  59.841  18.042  0.05  0.00          H   
+TER
+ATOM    970  GRI GRI A 169      53.894  59.841  19.542  0.19  0.00          H   
+TER
+ATOM    972  GRI GRI A 170      53.894  59.841  22.542  0.06  0.00          H   
+TER
+ATOM    973  GRI GRI A 171      53.894  59.841  24.042  0.20  0.00          H   
+TER
+ATOM    978  GRI GRI A 172      53.894  61.341  18.042  0.08  0.00          H   
+TER
+ATOM    979  GRI GRI A 173      53.894  61.341  19.542  0.00  0.00          H   
+TER
+ATOM    980  GRI GRI A 174      53.894  61.341  21.042  0.10  0.00          H   
+TER
+ATOM    981  GRI GRI A 175      53.894  61.341  22.542  0.07  0.00          H   
+TER
+ATOM    982  GRI GRI A 176      53.894  61.341  24.042  0.02  0.00          H   
+TER
+ATOM    983  GRI GRI A 177      53.894  61.341  25.542  0.00  0.00          H   
+TER
+ATOM    990  GRI GRI A 178      53.894  62.841  22.542  0.01  0.00          H   
+TER
+ATOM    991  GRI GRI A 179      53.894  62.841  24.042  0.00  0.00          H   
+TER
+ATOM   1019  GRI GRI A 180      55.394  56.841  19.542  0.00  0.00          H   
+TER
+ATOM   1026  GRI GRI A 181      55.394  58.341  19.542  0.01  0.00          H   
+TER
+ATOM   1028  GRI GRI A 182      55.394  58.341  22.542  0.01  0.00          H   
+TER
+ATOM   1029  GRI GRI A 183      55.394  58.341  24.042  0.00  0.00          H   
+TER
+ATOM   1034  GRI GRI A 184      55.394  59.841  19.542  0.03  0.00          H   
+TER
+ATOM   1035  GRI GRI A 185      55.394  59.841  21.042  0.06  0.00          H   
+TER
+ATOM   1044  GRI GRI A 186      55.394  61.341  21.042  0.00  0.00          H   
+TER

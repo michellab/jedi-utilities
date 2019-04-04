@@ -1,0 +1,1 @@
+../../../scripts/jedi-paramscan.py
