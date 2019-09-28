@@ -86,6 +86,9 @@ parser.add_argument('-c','--cutoff',nargs="?",
 parser.add_argument('-s','--spacing', nargs="?",
                     default="0.15",
                     help="the spacing between neighboring grid points (in nm)")
+parser.add_argument('-cp','--cutoff_protein',nargs='?',
+                    default=0,
+                    help="Cutoff to extend the binding site further away than the grid")
 parser.add_argument('-w', '--ignore_waters',nargs="?",
                     default="yes",
                     help="omit water oxygens in apolar atoms file")
@@ -429,6 +432,8 @@ def selectPolarApolar(frame, grid_min, grid_max, ligand=None,ligname=None):
     #
     polar_list = []
     apolar_list = []
+    if args.cutoff_protein > lig_cutoff:
+        lig_cutoff=args.cutoff_protein
     for i in range(0,frame.n_atoms):
         if frame.topology.atom(i).residue.name in [ligname,'HOH','WAT','SOL']:
            continue
