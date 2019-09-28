@@ -86,8 +86,8 @@ parser.add_argument('-c','--cutoff',nargs="?",
 parser.add_argument('-s','--spacing', nargs="?",
                     default="0.15",
                     help="the spacing between neighboring grid points (in nm)")
-parser.add_argument('-cp','--cutoff_protein',nargs='?',
-                    default=0,
+parser.add_argument('-cp','--cutoff_protein',nargs='?',type=float,
+                    default=0.,
                     help="Cutoff to extend the binding site further away than the grid")
 parser.add_argument('-w', '--ignore_waters',nargs="?",
                     default="yes",
@@ -188,7 +188,7 @@ ERROR ! The -k flag can only have "yes" or "no". Default is "yes".
     print (args)
     return args.input, args.ligand, float(args.cutoff), args.region, float(args.spacing),\
         args.apolar,args.polar,args.grid,args.ignore_waters,args.crop,args.full,args.fpocket,\
-        args.ligandname
+        args.ligandname,args.cutoff_protein
 
 
 def loadStructure(pdbfile,origin=None):
@@ -419,7 +419,7 @@ def defineGrid(frame, full, ligand=None, lig_cutoff=5.0, region=None, spacing=0.
     grid = mdtraj.Trajectory(xyz, top)
     return grid, mincoords, maxcoords
 
-def selectPolarApolar(frame, grid_min, grid_max, ligand=None,ligname=None):
+def selectPolarApolar(frame, grid_min, grid_max,lig_cutoff,cutoff_protein,ligand=None,ligname=None):
     """Input: frame: a mdtraj frame
               grid_min: minimum grid coordinates
               grid_max: maximim grid coordinates
@@ -432,8 +432,8 @@ def selectPolarApolar(frame, grid_min, grid_max, ligand=None,ligname=None):
     #
     polar_list = []
     apolar_list = []
-    if args.cutoff_protein > lig_cutoff:
-        lig_cutoff=args.cutoff_protein
+    if cutoff_protein > lig_cutoff:
+        lig_cutoff=cutoff_protein
     for i in range(0,frame.n_atoms):
         if frame.topology.atom(i).residue.name in [ligname,'HOH','WAT','SOL']:
            continue
@@ -565,7 +565,7 @@ if __name__ == '__main__':
     print ("*** jedi setup beginning *** ")
     # Parse command line arguments
     system_pdb, ligand_pdb, lig_cutoff, region_dim, spacing,\
-        apolar_pdb, polar_pdb, grid_pdb, wat, crop, full, fpocket_pdb, ligname = parse(parser)
+        apolar_pdb, polar_pdb, grid_pdb, wat, crop, full, fpocket_pdb, ligname, cutoff_protein = parse(parser)
     # Load protein coordinates
     system,bfact = loadStructure(system_pdb)
 
@@ -605,7 +605,7 @@ if __name__ == '__main__':
     grid_data = defineGrid(system,full,ligand=ligand, lig_cutoff=lig_cutoff,\
                                    region=region, spacing=spacing,fpocket=fpocket,bfact=bfact)
     polar, polar_indices, apolar, apolar_indices =\
-        selectPolarApolar(system, grid_data[1], grid_data[2],ligand,ligname)
+        selectPolarApolar(system, grid_data[1], grid_data[2],lig_cutoff,cutoff_protein,ligand,ligname)
     # Now center grid on COM of polar+apolar region
     centerGrid(grid_data, polar, apolar)
     #sys.exit(-1)
