@@ -35,6 +35,8 @@ parser.add_argument('-i','--input_grid', nargs="?",
                     help='Name of the grid xyz file')
 parser.add_argument('-a','--input_activities',nargs="?",
                     help='Name of the input_activities file')
+parser.add_argument('-p','--property',nargs="?", default="activity",
+                    help='Property to print as occupancy (activity, lig_i, Contact_i, Exposure_i)')
 parser.add_argument('-o','--output_grid',nargs="?",
                     help='Output pdb file with the input_activities as the occupancy')
 parser.add_argument('-k', '--crop',nargs="?",
@@ -78,7 +80,15 @@ ERROR ! Grid output file must be specified. See usage above.
      else:
         print ('the -k/--crop flag only accepts "yes" or "no. Default is "yes".')
 
-     return args.input_grid, args.input_activities, args.output_grid, args.crop
+     properties=["activity","lig","contact","exposure","all"]
+     if (args.property) not in properties:
+        print ("@@@\n\
+         ERROR ! -p/--property must have one of the following values: "+",".join(properties)+". Default is activity.\n"+\
+         "@@@")
+        sys.exit(-1)
+
+
+     return args.input_grid, args.input_activities, args.property, args.output_grid, args.crop
 
 def getGridCoordinates(input_grid):
     coords=[]
@@ -99,11 +109,19 @@ def getGridCoordinates(input_grid):
 
 def getActivities(input_activities):
     activities=[]
+    lig_i=[]
+    Contact_i=[]
+    Exposure_i=[]
     activities_file=open(input_activities,'r')
     for line in activities_file:
-        activities.append(float(line.split()[0]))
+        if (line.startswith("Point")):
+           continue
+        activities.append(float(line.split()[1]))
+        lig_i.append(float(line.split()[2]))
+        Contact_i.append(float(line.split()[3]))
+        Exposure_i.append(float(line.split()[4]))
     activities_file.close()
-    return activities
+    return activities,lig_i,Contact_i,Exposure_i
 
 def getGridObject(coords,activities,num_points):
     top = mdtraj.Topology()
@@ -142,9 +160,29 @@ def outputPdb(grid_object,activities,output_grid):
 
 if __name__ == '__main__':
    print (help_message) 
-   input_grid,input_activities,output_grid,crop=parse(parser)
+   input_grid,input_activities,prop,output_grid,crop=parse(parser)
    coords,num_points=getGridCoordinates(input_grid)
-   activities=getActivities(input_activities)
+   activities,lig_i,Contact_i,Exposure_i=getActivities(input_activities)
    grid_object=getGridObject(coords,activities,num_points)
-   outputPdb(grid_object,activities,output_grid) 
-   
+   output_grid_base=output_grid.split('.pdb')[0]
+   if (prop=="activity"):
+      output_grid =output_grid_base+".activity.pdb"
+      outputPdb(grid_object,activities,output_grid)
+   elif (prop=="lig"):
+      output_grid =output_grid_base+".lig.pdb"
+      outputPdb(grid_object,lig_i,output_grid)
+   elif(prop=="contact"):
+      output_grid =output_grid_base+".contact.pdb"
+      outputPdb(grid_object,Contact_i,output_grid)
+   elif (prop=="exposure"):
+      output_grid =output_grid_base+".exposure.pdb"
+      outputPdb(grid_object,Exposure_i,output_grid)
+   elif (prop=="all"):
+      output_grid =output_grid_base+".activity.pdb"
+      outputPdb(grid_object,activities,output_grid)
+      output_grid =output_grid_base+".lig.pdb"
+      outputPdb(grid_object,lig_i,output_grid)
+      output_grid =output_grid_base+".contact.pdb"
+      outputPdb(grid_object,Contact_i,output_grid)
+      output_grid =output_grid_base+".exposure.pdb"
+      outputPdb(grid_object,Exposure_i,output_grid)
