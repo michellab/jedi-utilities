@@ -30,8 +30,10 @@ def parser():
                     help='Maximum number of iterations for the optimisation of theta')
     parser.add_argument('-lmd','--lig_mindist', nargs="?", default=0.2, type=float,
                     help='maximum distance gridpoint-ligand to consider them overlapping')
-    parser.add_argument('-plc','--prot_lig_cutoff', nargs="?", default=0.5, type=float,
+    parser.add_argument('-plc','--prot_lig_cutoff', nargs="?", default=0.4, type=float,
                     help='maximum distance protein-ligand to consider them interacting')
+    parser.add_argument('-pcent','--percentage', nargs="?", default=80.0, type=float,
+                    help='Percentage of gridpoints overlapping a ligand that should have activity 1')                
     args=parser.parse_args()
 
     return args
@@ -270,7 +272,7 @@ def Emin_trainer(dataset,theta,cc2,percentage):
     pcent=percentage/100
     i=int(len(num_neighbours)*pcent)-1
     E=num_neighbours[i]
-    print("Emin+deltaE value that covers ", percentage, "\% of points overlapping with a ligand atom: ", cc2)
+    print("Emin+deltaE value that covers ", percentage, "\% of points overlapping with a ligand atom: ", E)
     print("------------ Emin+deltaE --------------")
     
     #Plot a histogram for Thesis / paper purposes
@@ -288,16 +290,16 @@ if __name__=="__main__":
     dataset=load_structures(dataset)
 
     # Optimise theta so that the calculated mindist is as well correlated as possible with the actual minimum distance gridpoint-atom
-    #theta=theta_trainer(dataset,r2_target=1.0,tolerance=args.theta_tolerance,max_iter=args.theta_max_iter,d_theta=args.d_theta)
+    theta=theta_trainer(dataset,r2_target=1.0,tolerance=args.theta_tolerance,max_iter=args.theta_max_iter,d_theta=args.d_theta)
     
     # Optimise CCmin+deltaCC so that Son_mind is equal to 1 for the points within 0.2 nm of any ligand heavy atom
     # 1) Get a list of grid points within 0.2 nm of any ligand heavy atoms.
     dataset=get_points_ligand(dataset, args.lig_mindist,args.prot_lig_cutoff)
-    #CC=cc_min_trainer(dataset, 5.0,80.0)
+    CC=cc_min_trainer(dataset, theta,args.percentage)
     dataset=get_neighbours(dataset)
-    #CC2=cc2_min_trainer(dataset,5.0,80.0)
-    E=Emin_trainer(dataset,5.0,0.21833799852702668,80.0)
-    print(dataset)
+    CC2=cc2_min_trainer(dataset,theta,args.percentage)
+    E=Emin_trainer(dataset,theta,CC2,args.percentage)
+    #print(dataset)
 
     
  
