@@ -30,10 +30,11 @@ def parser():
                     help='Maximum number of iterations for the optimisation of theta')
     parser.add_argument('-lmd','--lig_mindist', nargs="?", default=0.2, type=float,
                     help='maximum distance gridpoint-ligand to consider them overlapping')
+    parser.add_argument('-plc','--prot_lig_cutoff', nargs="?", default=0.5, type=float,
+                    help='maximum distance protein-ligand to consider them interacting')
     args=parser.parse_args()
 
     return args
-
 
 def load_structures(dataset):
     grids=[]
@@ -48,8 +49,6 @@ def load_structures(dataset):
     dataset['protein']=proteins
     return dataset
         
-
-
 def get_r_min(point,atoms):
     r_min=np.inf
     for atom in atoms:
@@ -132,10 +131,20 @@ def theta_trainer(dataset,r2_target,tolerance,max_iter,d_theta):
     
     return theta_selected
 
-def get_points_ligand(dataset, lig_mindist):
+def get_points_ligand(dataset, lig_mindist, prot_lig_cutoff):
     dataset_points_ligand=[]
     for i in range(0,len(dataset['PDB'])):
-        ligand=dataset['ligand'][i].xyz[0]
+        
+        ligand_all=dataset['ligand'][i].xyz[0]
+        protein=dataset['protein'][i].xyz[0]
+        ligand=[]
+        # Select ligand atoms that are close to the protein
+        for atom in ligand_all:
+            r_min=get_r_min(atom,protein)
+            if r_min<prot_lig_cutoff:
+               ligand.append(atom)
+        
+        # Select grid points that are close to those atoms
         grid=dataset['grid'][i].xyz[0]
         points_ligand=[]
         for j in range(0,len(grid)):
@@ -177,7 +186,7 @@ def cc_min_trainer(dataset, theta, percentage):
     plt.ylabel("Probability", fontsize=20)
     plt.savefig("Mindist_hist.png",dpi=300)
     #FIXME add something here to select the CCmin+deltaCC we want to cover a certain percentage of the histogram
-    return 0
+    return cc
 
 def get_neighbours(dataset, GPmin=0.25, GPmax=0.35,max_allowed_neighbours=38):
     neighbours=[]
@@ -214,7 +223,7 @@ def cc2_min_trainer(dataset,theta,percentage):
         grid=dataset['grid'][i].xyz[0]
         neighbours=dataset['Neighbours'][i]
         for neighbour_list in neighbours:
-            for j in neighbour_list:
+            for j in neighbour_list: # Notice that we are not caring who they are neighbors with
                 mindist=calc_mindist(grid[j],protein,theta)
                 mindist_active.append(mindist)
 
@@ -226,8 +235,8 @@ def cc2_min_trainer(dataset,theta,percentage):
         print(pcent, cc_i)
     pcent=percentage/100
     i=int(len(mindist_active)*pcent)-1
-    cc=mindist_active[i]
-    print("CC2min+deltaCC2 value that covers ", percentage, "\% of points overlapping with a ligand atom: ", cc)
+    cc2=mindist_active[i]
+    print("CC2min (not deltaCC2 because that's a S_off) value that covers ", percentage, "\% of points overlapping with a ligand atom: ", cc2)
     print("------------ CC2min+deltaCC2 --------------")
     
     #Plot a histogram for Thesis / paper purposes
@@ -236,8 +245,40 @@ def cc2_min_trainer(dataset,theta,percentage):
     plt.xlabel("Minimum distance grid point neighbour - protein atom (nm)",fontsize=20)
     plt.ylabel("Probability", fontsize=20)
     plt.savefig("Mindist2_hist.png",dpi=300)
-    return 0
+    return cc2
 
+def Emin_trainer(dataset,theta,cc2,percentage):
+    num_neighbours=[]
+    for i in range(0,len(dataset['PDB'])):
+        protein=dataset['protein'][i].xyz[0]
+        grid=dataset['grid'][i].xyz[0]
+        neighbours=dataset['Neighbours'][i] #notice these are only the neighbours of gps overlapping the ligand
+        for j in range(0,len(neighbours)): # Notice that we are not caring who they are neighbors with
+            count_neighbours=0
+            for k in neighbours[j]:
+                mindist=calc_mindist(grid[k],protein,theta)
+                if mindist<=cc2:
+                    count_neighbours += 1
+            num_neighbours.append(count_neighbours)
+    
+    num_neighbours.sort(reverse=True)
+    print("------------ Emin+deltaE --------------")
+    for pcent in [0.2,0.4,0.6,0.8,1.0]:
+        i=int(len(num_neighbours)*pcent)-1
+        E_i=num_neighbours[i]
+        print(pcent, E_i)
+    pcent=percentage/100
+    i=int(len(num_neighbours)*pcent)-1
+    E=num_neighbours[i]
+    print("Emin+deltaE value that covers ", percentage, "\% of points overlapping with a ligand atom: ", cc2)
+    print("------------ Emin+deltaE --------------")
+    
+    #Plot a histogram for Thesis / paper purposes
+    fig=plt.figure(figsize=(20,10))
+    plt.hist(num_neighbours, density=True,stacked=True, bins = 10)
+    plt.xlabel("Exposure in number of grid points",fontsize=20)
+    plt.ylabel("Probability", fontsize=20)
+    plt.savefig("Exposure_hist.png",dpi=300)
 
 
 if __name__=="__main__":
@@ -251,10 +292,11 @@ if __name__=="__main__":
     
     # Optimise CCmin+deltaCC so that Son_mind is equal to 1 for the points within 0.2 nm of any ligand heavy atom
     # 1) Get a list of grid points within 0.2 nm of any ligand heavy atoms.
-    dataset=get_points_ligand(dataset, args.lig_mindist)
-    CC=cc_min_trainer(dataset, 5.0,80.0)
+    dataset=get_points_ligand(dataset, args.lig_mindist,args.prot_lig_cutoff)
+    #CC=cc_min_trainer(dataset, 5.0,80.0)
     dataset=get_neighbours(dataset)
-    CC2=cc2_min_trainer(dataset,5.0,80.0)
+    #CC2=cc2_min_trainer(dataset,5.0,80.0)
+    E=Emin_trainer(dataset,5.0,0.21833799852702668,80.0)
     print(dataset)
 
     
