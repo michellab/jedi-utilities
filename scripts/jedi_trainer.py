@@ -22,6 +22,8 @@ def parser():
                               Must be in a directory that contains a subdirectory for each PDB.')
     parser.add_argument('-d','--druggability', nargs="?",
                     help='Name of the value used as druggability measure. Must be present in --input as a column')
+    parser.add_argument('-tg','--theta_guess', nargs="?", default=5.0, type=float,
+                    help='First guess of theta')
     parser.add_argument('-dt','--d_theta', nargs="?", default=0.1, type=float,
                     help='increment for theta optimisation')
     parser.add_argument('-tmi','--theta_max_iter', nargs="?", default=100, type=int,
@@ -31,9 +33,7 @@ def parser():
     parser.add_argument('-lmd','--lig_mindist', nargs="?", default=0.2, type=float,
                     help='maximum distance gridpoint-ligand to consider them overlapping')
     parser.add_argument('-plc','--prot_lig_cutoff', nargs="?", default=0.4, type=float,
-                    help='maximum distance protein-ligand to consider them interacting')
-    parser.add_argument('-pcent','--percentage', nargs="?", default=80.0, type=float,
-                    help='Percentage of gridpoints overlapping a ligand that should have activity 1')                
+                    help='maximum distance protein-ligand to consider them interacting')                
     args=parser.parse_args()
 
     return args
@@ -67,7 +67,7 @@ def calc_mindist(point, atoms, theta):
     return mindist
     
 
-def theta_trainer(dataset,r2_target,tolerance,max_iter,d_theta):
+def theta_trainer(dataset,theta,r2_target,tolerance,max_iter,d_theta):
     """
     This will get the best set of r2, slope and intercept between mindist
     and r_min. We want the line to be as close as possible to y=x. It returns
@@ -96,8 +96,7 @@ def theta_trainer(dataset,r2_target,tolerance,max_iter,d_theta):
     theta_range=[]
     r2_max=0.0
     theta_selected=None
-    
-    theta=0.0
+
     n_iter=0
     while (abs(r2_max-r2_target)>tolerance):
         theta_range.append(theta)
@@ -135,8 +134,8 @@ def theta_trainer(dataset,r2_target,tolerance,max_iter,d_theta):
 
 def get_points_ligand(dataset, lig_mindist, prot_lig_cutoff):
     dataset_points_ligand=[]
+    percentages_ligand=[]
     for i in range(0,len(dataset['PDB'])):
-        
         ligand_all=dataset['ligand'][i].xyz[0]
         protein=dataset['protein'][i].xyz[0]
         ligand=[]
@@ -154,8 +153,25 @@ def get_points_ligand(dataset, lig_mindist, prot_lig_cutoff):
             if r_min<=lig_mindist:
                points_ligand.append(j)
         dataset_points_ligand.append(points_ligand)
+
+        #work out the percentage of the grid that is actually occupied by the ligand
+        percentage=len(points_ligand)/len(grid)*100
+        percentages_ligand.append(percentage)
+
     dataset['points_ligand']=dataset_points_ligand
-    return dataset
+    
+    pcent_lig=np.average(percentages_ligand)
+    pcent_lig_std=np.std(percentages_ligand)
+    print("The percentage of gridpoints colliding with a ligand is: ",pcent_lig, "+/-",pcent_lig_std)
+
+    #Plot a histogram for Thesis / paper purposes
+    fig=plt.figure(figsize=(20,10))
+    plt.hist(percentages_ligand, density=True, stacked=True, bins = 10)
+    plt.xlabel("Percentage of grid points overlapping a ligand",fontsize=20)
+    plt.ylabel("Probability", fontsize=20)
+    plt.savefig("Ligand.pcent.png",dpi=300)
+
+    return dataset, pcent_lig
 
 def cc_min_trainer(dataset, theta, percentage):
     mindist_active=[]
@@ -183,11 +199,11 @@ def cc_min_trainer(dataset, theta, percentage):
 
     #Plot a histogram for Thesis / paper purposes
     fig=plt.figure(figsize=(20,10))
-    plt.hist(mindist_active, density=True, stacked=True, bins = 10)
+    plt.hist(mindist_active, density=True, stacked=True, bins = 100)
     plt.xlabel("Minimum distance grid point - protein atom (nm)",fontsize=20)
     plt.ylabel("Probability", fontsize=20)
     plt.savefig("Mindist_hist.png",dpi=300)
-    #FIXME add something here to select the CCmin+deltaCC we want to cover a certain percentage of the histogram
+    
     return cc
 
 def get_neighbours(dataset, GPmin=0.25, GPmax=0.35,max_allowed_neighbours=38):
@@ -229,7 +245,7 @@ def cc2_min_trainer(dataset,theta,percentage):
                 mindist=calc_mindist(grid[j],protein,theta)
                 mindist_active.append(mindist)
 
-    mindist_active.sort()
+    mindist_active.sort(reverse=True)
     print("------------ CC2min+deltaCC2 --------------")
     for pcent in [0.2,0.4,0.6,0.8,1.0]:
         i=int(len(mindist_active)*pcent)-1
@@ -243,7 +259,7 @@ def cc2_min_trainer(dataset,theta,percentage):
     
     #Plot a histogram for Thesis / paper purposes
     fig=plt.figure(figsize=(20,10))
-    plt.hist(mindist_active, density=True,stacked=True, bins = 10)
+    plt.hist(mindist_active, density=True,stacked=True, bins = 100)
     plt.xlabel("Minimum distance grid point neighbour - protein atom (nm)",fontsize=20)
     plt.ylabel("Probability", fontsize=20)
     plt.savefig("Mindist2_hist.png",dpi=300)
@@ -277,7 +293,7 @@ def Emin_trainer(dataset,theta,cc2,percentage):
     
     #Plot a histogram for Thesis / paper purposes
     fig=plt.figure(figsize=(20,10))
-    plt.hist(num_neighbours, density=True,stacked=True, bins = 10)
+    plt.hist(num_neighbours, density=True,stacked=True, bins = 100)
     plt.xlabel("Exposure in number of grid points",fontsize=20)
     plt.ylabel("Probability", fontsize=20)
     plt.savefig("Exposure_hist.png",dpi=300)
@@ -290,15 +306,15 @@ if __name__=="__main__":
     dataset=load_structures(dataset)
 
     # Optimise theta so that the calculated mindist is as well correlated as possible with the actual minimum distance gridpoint-atom
-    theta=theta_trainer(dataset,r2_target=1.0,tolerance=args.theta_tolerance,max_iter=args.theta_max_iter,d_theta=args.d_theta)
+    theta=theta_trainer(dataset,theta=args.theta_guess,r2_target=1.0,tolerance=args.theta_tolerance,max_iter=args.theta_max_iter,d_theta=args.d_theta)
     
     # Optimise CCmin+deltaCC so that Son_mind is equal to 1 for the points within 0.2 nm of any ligand heavy atom
     # 1) Get a list of grid points within 0.2 nm of any ligand heavy atoms.
-    dataset=get_points_ligand(dataset, args.lig_mindist,args.prot_lig_cutoff)
-    CC=cc_min_trainer(dataset, theta,args.percentage)
+    dataset,percentage=get_points_ligand(dataset, args.lig_mindist,args.prot_lig_cutoff)
+    CC=cc_min_trainer(dataset, theta,percentage)
     dataset=get_neighbours(dataset)
-    CC2=cc2_min_trainer(dataset,theta,args.percentage)
-    E=Emin_trainer(dataset,theta,CC2,args.percentage)
+    CC2=cc2_min_trainer(dataset,theta,percentage)
+    E=Emin_trainer(dataset,theta,CC2,percentage)
     #print(dataset)
 
     
