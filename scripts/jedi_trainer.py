@@ -32,7 +32,7 @@ def parser():
                     help='Maximum number of iterations for the optimisation of theta')
     parser.add_argument('-lmd','--lig_mindist', nargs="?", default=0.2, type=float,
                     help='maximum distance gridpoint-ligand to consider them overlapping')
-    parser.add_argument('-plc','--prot_lig_cutoff', nargs="?", default=0.4, type=float,
+    parser.add_argument('-plc','--prot_lig_cutoff', nargs="?", default=0.35, type=float,
                     help='maximum distance protein-ligand to consider them interacting')                
     args=parser.parse_args()
 
@@ -311,10 +311,10 @@ if __name__=="__main__":
     # Optimise CCmin+deltaCC so that Son_mind is equal to 1 for the points within 0.2 nm of any ligand heavy atom
     # 1) Get a list of grid points within 0.2 nm of any ligand heavy atoms.
     dataset,percentage=get_points_ligand(dataset, args.lig_mindist,args.prot_lig_cutoff)
-    CC=cc_min_trainer(dataset, theta,percentage)
+    CC=cc_min_trainer(dataset, theta,100)
     dataset=get_neighbours(dataset)
-    CC2=cc2_min_trainer(dataset,theta,percentage)
-    E=Emin_trainer(dataset,theta,CC2,percentage)
+    CC2=cc2_min_trainer(dataset,theta,100)
+    E=Emin_trainer(dataset,theta,CC2,100)
     #print(dataset)
 
     
