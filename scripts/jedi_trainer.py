@@ -246,7 +246,7 @@ def cc2_min_trainer(dataset,theta,percentage):
                 mindist=calc_mindist(grid[j],protein,theta)
                 mindist_active.append(mindist)
 
-    mindist_active.sort(reverse=True)
+    mindist_active.sort()
     print("------------ CC2min+deltaCC2 --------------")
     for pcent in [0.2,0.4,0.6,0.8,1.0]:
         i=int(len(mindist_active)*pcent)-1
