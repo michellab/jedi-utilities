@@ -114,6 +114,7 @@ def theta_trainer(dataset,theta,r2_target,tolerance,max_iter,d_theta):
         r2=rvalue**2
         r2_lst.append(rvalue**2)
         print(n_iter, theta, r2)
+        theta_selected=theta
         if (r2>r2_max):
             r2_max=r2
         theta=theta+d_theta
