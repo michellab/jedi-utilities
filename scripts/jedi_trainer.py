@@ -30,10 +30,14 @@ def parser():
                     help='Maximum number of iterations for the optimisation of theta')
     parser.add_argument('-tt','--theta_tolerance', nargs="?", default=0.0001, type=float,
                     help='Maximum number of iterations for the optimisation of theta')
-    parser.add_argument('-lmd','--lig_mindist', nargs="?", default=0.2, type=float,
+    parser.add_argument('-lmd','--lig_mindist', nargs="?", default=0.15, type=float,
                     help='maximum distance gridpoint-ligand to consider them overlapping')
     parser.add_argument('-plc','--prot_lig_cutoff', nargs="?", default=0.35, type=float,
-                    help='maximum distance protein-ligand to consider them interacting')                
+                    help='maximum distance protein-ligand to consider them interacting')
+    parser.add_argument('-nbins','--nbins', nargs="?", default=100, type=int,
+                    help='Number of bins for the histograms')
+    parser.add_argument('-cov','--coverage', nargs="?", default=80, type=int,
+                    help='percentage of the gridpoints that are on top of the ligand and have to be fully active')                 
     args=parser.parse_args()
 
     return args
@@ -133,7 +137,7 @@ def theta_trainer(dataset,theta,r2_target,tolerance,max_iter,d_theta):
     
     return theta_selected
 
-def get_points_ligand(dataset, lig_mindist, prot_lig_cutoff):
+def get_points_ligand(dataset, lig_mindist, prot_lig_cutoff,nbins):
     dataset_points_ligand=[]
     percentages_ligand=[]
     for i in range(0,len(dataset['PDB'])):
@@ -150,8 +154,8 @@ def get_points_ligand(dataset, lig_mindist, prot_lig_cutoff):
         grid=dataset['grid'][i].xyz[0]
         points_ligand=[]
         for j in range(0,len(grid)):
-            r_min=get_r_min(grid[j],ligand)
             if r_min<=lig_mindist:
+            r_min=get_r_min(grid[j],ligand)
                points_ligand.append(j)
         dataset_points_ligand.append(points_ligand)
 
@@ -167,14 +171,14 @@ def get_points_ligand(dataset, lig_mindist, prot_lig_cutoff):
 
     #Plot a histogram for Thesis / paper purposes
     fig=plt.figure(figsize=(20,10))
-    plt.hist(percentages_ligand, density=True, stacked=True, bins = 10)
+    plt.hist(percentages_ligand, density=True, stacked=True, bins = nbins)
     plt.xlabel("Percentage of grid points overlapping a ligand",fontsize=20)
     plt.ylabel("Probability", fontsize=20)
     plt.savefig("Ligand.pcent.png",dpi=300)
 
     return dataset, pcent_lig
 
-def cc_min_trainer(dataset, theta, percentage):
+def cc_min_trainer(dataset, theta, percentage,nbins):
     mindist_active=[]
     for i in range(0,len(dataset['PDB'])):
         protein=dataset['protein'][i].xyz[0]
@@ -200,7 +204,7 @@ def cc_min_trainer(dataset, theta, percentage):
 
     #Plot a histogram for Thesis / paper purposes
     fig=plt.figure(figsize=(20,10))
-    plt.hist(mindist_active, density=True, stacked=True, bins = 100)
+    plt.hist(mindist_active, density=True, stacked=True, bins = nbins)
     plt.xlabel("Minimum distance grid point - protein atom (nm)",fontsize=20)
     plt.ylabel("Probability", fontsize=20)
     plt.savefig("Mindist_hist.png",dpi=300)
@@ -226,8 +230,8 @@ def get_neighbours(dataset, GPmin=0.25, GPmax=0.35,max_allowed_neighbours=38):
                    neighbours_j_count += 1
                    if neighbours_j_count>max_allowed_neighbours:
                        sys.exit("Too many neighbours detected. You are doing something wrong.")
-                   if neighbours_j_count>max_neighbours:
-                      max_neighbours=neighbours_j_count   
+            if neighbours_j_count>max_neighbours:
+               max_neighbours=neighbours_j_count   
             neighbours_i.append(neighbours_j)
         neighbours.append(neighbours_i)
     print("max neighbours: ", max_neighbours)
@@ -235,7 +239,7 @@ def get_neighbours(dataset, GPmin=0.25, GPmax=0.35,max_allowed_neighbours=38):
 
     return dataset
 
-def cc2_min_trainer(dataset,theta,percentage):
+def cc2_min_trainer(dataset,theta,percentage,nbins):
     mindist_active=[]
     for i in range(0,len(dataset['PDB'])):
         protein=dataset['protein'][i].xyz[0]
@@ -260,13 +264,13 @@ def cc2_min_trainer(dataset,theta,percentage):
     
     #Plot a histogram for Thesis / paper purposes
     fig=plt.figure(figsize=(20,10))
-    plt.hist(mindist_active, density=True,stacked=True, bins = 100)
+    plt.hist(mindist_active, density=True,stacked=True, bins = nbins)
     plt.xlabel("Minimum distance grid point neighbour - protein atom (nm)",fontsize=20)
     plt.ylabel("Probability", fontsize=20)
     plt.savefig("Mindist2_hist.png",dpi=300)
     return cc2
 
-def Emin_trainer(dataset,theta,cc2,percentage):
+def Emin_trainer(dataset,theta,cc2,percentage,nbins):
     num_neighbours=[]
     for i in range(0,len(dataset['PDB'])):
         protein=dataset['protein'][i].xyz[0]
@@ -294,7 +298,7 @@ def Emin_trainer(dataset,theta,cc2,percentage):
     
     #Plot a histogram for Thesis / paper purposes
     fig=plt.figure(figsize=(20,10))
-    plt.hist(num_neighbours, density=True,stacked=True, bins = 100)
+    plt.hist(num_neighbours, density=True,stacked=True, bins = nbins)
     plt.xlabel("Exposure in number of grid points",fontsize=20)
     plt.ylabel("Probability", fontsize=20)
     plt.savefig("Exposure_hist.png",dpi=300)
@@ -311,11 +315,11 @@ if __name__=="__main__":
     
     # Optimise CCmin+deltaCC so that Son_mind is equal to 1 for the points within 0.2 nm of any ligand heavy atom
     # 1) Get a list of grid points within 0.2 nm of any ligand heavy atoms.
-    dataset,percentage=get_points_ligand(dataset, args.lig_mindist,args.prot_lig_cutoff)
-    CC=cc_min_trainer(dataset, theta,100)
+    dataset,percentage=get_points_ligand(dataset, args.lig_mindist,args.prot_lig_cutoff,args.nbins)
+    CC=cc_min_trainer(dataset, theta,args.coverage,args.nbins)
     dataset=get_neighbours(dataset)
-    CC2=cc2_min_trainer(dataset,theta,100)
-    E=Emin_trainer(dataset,theta,CC2,100)
+    CC2=cc2_min_trainer(dataset,theta,args.coverage,args.nbins)
+    E=Emin_trainer(dataset,theta,CC2,args.coverage,args.nbins)
     #print(dataset)
 
     
