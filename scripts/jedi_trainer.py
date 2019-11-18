@@ -140,6 +140,7 @@ def theta_trainer(dataset,theta,r2_target,tolerance,max_iter,d_theta):
 def get_points_ligand(dataset, lig_mindist, prot_lig_cutoff,nbins):
     dataset_points_ligand=[]
     percentages_ligand=[]
+    counts_ligand=[]
     for i in range(0,len(dataset['PDB'])):
         ligand_all=dataset['ligand'][i].xyz[0]
         protein=dataset['protein'][i].xyz[0]
@@ -154,11 +155,13 @@ def get_points_ligand(dataset, lig_mindist, prot_lig_cutoff,nbins):
         grid=dataset['grid'][i].xyz[0]
         points_ligand=[]
         for j in range(0,len(grid)):
-            if r_min<=lig_mindist:
             r_min=get_r_min(grid[j],ligand)
+            if r_min<=lig_mindist:
                points_ligand.append(j)
         dataset_points_ligand.append(points_ligand)
 
+        #count the number of gridpoints overlapping a ligand
+        counts_ligand.append(len(points_ligand))
         #work out the percentage of the grid that is actually occupied by the ligand
         percentage=len(points_ligand)/len(grid)*100
         percentages_ligand.append(percentage)
@@ -174,7 +177,14 @@ def get_points_ligand(dataset, lig_mindist, prot_lig_cutoff,nbins):
     plt.hist(percentages_ligand, density=True, stacked=True, bins = nbins)
     plt.xlabel("Percentage of grid points overlapping a ligand",fontsize=20)
     plt.ylabel("Probability", fontsize=20)
-    plt.savefig("Ligand.pcent.png",dpi=300)
+    plt.savefig("Ligand_pcent.png",dpi=300)
+
+    #Plot a histogram for Thesis / paper purposes
+    fig=plt.figure(figsize=(20,10))
+    plt.hist(counts_ligand, density=True, stacked=True, bins = nbins)
+    plt.xlabel("Number of grid points overlapping a ligand",fontsize=20)
+    plt.ylabel("Probability", fontsize=20)
+    plt.savefig("Ligand_counts.png",dpi=300)
 
     return dataset, pcent_lig
 
