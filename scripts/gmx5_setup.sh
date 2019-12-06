@@ -8,7 +8,7 @@ function globexist # To check if ligands exist ([-e *GMX*] crashes if there is m
 #paths
 utilities=~/github/jedi-utilities
 mdp=$utilities/mdp
-gmx=gmx
+gmx=/home/joan/local/gromacs-5.1.4-plumed2_julien/bin/gmx_mpi
 merge_gro=$utilities/scripts/merge_coordinates_gro.py
 merge_atomtypes=$utilities/scripts/merge_atomtypes.py
 
@@ -21,7 +21,7 @@ solvent=tip3p
 boxtype=dodecahedron
 boxsize=1.0
 
-gmx pdb2gmx -f $system'_protein.pdb' -o $system'_protein.gro' -p $system'_protein.top' -ff $forcefield -water $solvent -ignh
+$gmx pdb2gmx -f $system'_protein.pdb' -o $system'_protein.gro' -p $system'_protein.top' -ff $forcefield -water $solvent -ignh
 
 if globexist  *GMX* ; then
    # The box line  nd the waters have to be deleted and reinserted

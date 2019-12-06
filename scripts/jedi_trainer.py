@@ -5,6 +5,7 @@ import pandas as pd
 import scipy as scp
 from scipy import stats
 import matplotlib
+matplotlib.use('Agg') # set the backend before importing pyplot
 import matplotlib.pyplot as plt
     
 def parser():
@@ -174,14 +175,14 @@ def get_points_ligand(dataset, lig_mindist, prot_lig_cutoff,nbins):
 
     #Plot a histogram for Thesis / paper purposes
     fig=plt.figure(figsize=(20,10))
-    plt.hist(percentages_ligand, density=True, stacked=True, bins = nbins)
+    plt.hist(percentages_ligand, stacked=True, bins = nbins)
     plt.xlabel("Percentage of grid points overlapping a ligand",fontsize=20)
     plt.ylabel("Probability", fontsize=20)
     plt.savefig("Ligand_pcent.png",dpi=300)
 
     #Plot a histogram for Thesis / paper purposes
     fig=plt.figure(figsize=(20,10))
-    plt.hist(counts_ligand, density=True, stacked=True, bins = nbins)
+    plt.hist(counts_ligand, stacked=True, bins = nbins)
     plt.xlabel("Number of grid points overlapping a ligand",fontsize=20)
     plt.ylabel("Probability", fontsize=20)
     plt.savefig("Ligand_counts.png",dpi=300)
@@ -214,7 +215,7 @@ def cc_min_trainer(dataset, theta, percentage,nbins):
 
     #Plot a histogram for Thesis / paper purposes
     fig=plt.figure(figsize=(20,10))
-    plt.hist(mindist_active, density=True, stacked=True, bins = nbins)
+    plt.hist(mindist_active, stacked=True, bins = nbins)
     plt.xlabel("Minimum distance grid point - protein atom (nm)",fontsize=20)
     plt.ylabel("Probability", fontsize=20)
     plt.savefig("Mindist_hist.png",dpi=300)
@@ -274,7 +275,7 @@ def cc2_min_trainer(dataset,theta,percentage,nbins):
     
     #Plot a histogram for Thesis / paper purposes
     fig=plt.figure(figsize=(20,10))
-    plt.hist(mindist_active, density=True,stacked=True, bins = nbins)
+    plt.hist(mindist_active,stacked=True, bins = nbins)
     plt.xlabel("Minimum distance grid point neighbour - protein atom (nm)",fontsize=20)
     plt.ylabel("Probability", fontsize=20)
     plt.savefig("Mindist2_hist.png",dpi=300)
@@ -308,7 +309,7 @@ def Emin_trainer(dataset,theta,cc2,percentage,nbins):
     
     #Plot a histogram for Thesis / paper purposes
     fig=plt.figure(figsize=(20,10))
-    plt.hist(num_neighbours, density=True,stacked=True, bins = nbins)
+    plt.hist(num_neighbours,stacked=True, bins = nbins)
     plt.xlabel("Exposure in number of grid points",fontsize=20)
     plt.ylabel("Probability", fontsize=20)
     plt.savefig("Exposure_hist.png",dpi=300)
