@@ -109,7 +109,6 @@ def getGridCoordinates(input_grid):
 
 def getActivities(input_activities):
     activities=[]
-    lig_i=[]
     Contact_i=[]
     Exposure_i=[]
     activities_file=open(input_activities,'r')
@@ -117,11 +116,10 @@ def getActivities(input_activities):
         if (line.startswith("Point")):
            continue
         activities.append(float(line.split()[1]))
-        lig_i.append(float(line.split()[2]))
-        Contact_i.append(float(line.split()[3]))
-        Exposure_i.append(float(line.split()[4]))
+        Contact_i.append(float(line.split()[2]))
+        Exposure_i.append(float(line.split()[3]))
     activities_file.close()
-    return activities,lig_i,Contact_i,Exposure_i
+    return activities,Contact_i,Exposure_i
 
 def getGridObject(coords,activities,num_points):
     top = mdtraj.Topology()
@@ -162,15 +160,12 @@ if __name__ == '__main__':
    print (help_message) 
    input_grid,input_activities,prop,output_grid,crop=parse(parser)
    coords,num_points=getGridCoordinates(input_grid)
-   activities,lig_i,Contact_i,Exposure_i=getActivities(input_activities)
+   activities,Contact_i,Exposure_i=getActivities(input_activities)
    grid_object=getGridObject(coords,activities,num_points)
    output_grid_base=output_grid.split('.pdb')[0]
    if (prop=="activity"):
       output_grid =output_grid_base+".activity.pdb"
       outputPdb(grid_object,activities,output_grid)
-   elif (prop=="lig"):
-      output_grid =output_grid_base+".lig.pdb"
-      outputPdb(grid_object,lig_i,output_grid)
    elif(prop=="contact"):
       output_grid =output_grid_base+".contact.pdb"
       outputPdb(grid_object,Contact_i,output_grid)
@@ -180,8 +175,6 @@ if __name__ == '__main__':
    elif (prop=="all"):
       output_grid =output_grid_base+".activity.pdb"
       outputPdb(grid_object,activities,output_grid)
-      output_grid =output_grid_base+".lig.pdb"
-      outputPdb(grid_object,lig_i,output_grid)
       output_grid =output_grid_base+".contact.pdb"
       outputPdb(grid_object,Contact_i,output_grid)
       output_grid =output_grid_base+".exposure.pdb"
