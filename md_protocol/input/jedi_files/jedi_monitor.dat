@@ -1,5 +1,5 @@
-je_lig: JEDI APOLAR=apolar.pdb POLAR=polar.pdb GRID=grid.pdb PARAMETERS=jedi.params SITE=ligand.pdb STRIDE=2500 SUMMARY=jedi_stats.dat GRIDSTRIDE=0 SIGMA=0.05 DUMPDERIVATIVES=0 
-je_nolig: JEDI APOLAR=apolar.pdb POLAR=polar.pdb GRID=grid.pdb PARAMETERS=jedi.params STRIDE=2500 SUMMARY=jedi_stats.dat GRIDSTRIDE=0 SIGMA=0.05 DUMPDERIVATIVES=0 
-PRINT ARG=je FILE=COLVAR STRIDE=2500
+je_lig: JEDI APOLAR=apolar.pdb POLAR=polar.pdb GRID=grid.pdb PARAMETERS=jedi.params SITE=ligand.pdb STRIDE=2500 SUMMARY=jedi_stats.dat.lig GRIDSTRIDE=0 SIGMA=0.05 DUMPDERIVATIVES=0 
+je_nolig: JEDI APOLAR=apolar.pdb POLAR=polar.pdb GRID=grid.pdb PARAMETERS=jedi.params STRIDE=2500 SUMMARY=jedi_stats.dat.nolig GRIDSTRIDE=0 SIGMA=0.05 DUMPDERIVATIVES=0 
+PRINT ARG=je_lig,je_nolig FILE=COLVAR STRIDE=2500
 
 

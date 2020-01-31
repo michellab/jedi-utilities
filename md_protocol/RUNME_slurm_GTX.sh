@@ -3,7 +3,7 @@ function globexist # To check if ligands exist ([-e *GMX*] crashes if there is m
    test -e "$1" -o -L "$1"
   }
 
-gmx=/home/joan/local/gromacs-5.1.4.serial/bin/gmx_mpi
+gmx=/home/joan/local/gromacs-5.1.4-plumed2_julien/bin/gmx_mpi
 plumed=/home/joan/local/bin/plumed
 ntomp=16
 
@@ -42,8 +42,8 @@ md="
      bash ../../../../../scripts/gmx5_setup.sh complex
      if [ ! -f complex_ions.gro ]; then continue; fi
      $gmx editconf -f complex_ions.gro -o complex_ions.pdb
-     grep 'LIG' complex_ions.pdb > ligand_centered.pdb
-     python ../../../../../scripts/jedi-setup.py -i complex_ions.pdb -l ligand_centered.pdb -ln LIG -c 0.6 -s 0.15 # the atom indices change from pdb to gro so we have to do it again
+     grep 'LIG' complex_ions.pdb > ligand.pdb
+     python ../../../../../scripts/jedi-setup.py -i complex_ions.pdb -l ligand.pdb -ln LIG -c 0.6 -s 0.15 # the atom indices change from pdb to gro so we have to do it again
      cp apolar.pdb polar.pdb grid.pdb ../apoWet
      cp apolar.pdb polar.pdb grid.pdb ../apoDry
      $gmx grompp -f ../../../../../mdp/em_10000_sd.mdp -c complex_ions.gro -p complex.top -o complex_em_sd.tpr
@@ -66,6 +66,8 @@ md="
      $gmx mdrun -ntomp $ntomp -v -deffnm complex_md -nsteps 25000000 -plumed jedi_monitor.dat
      if [ ! -f complex_md.gro ]; then continue; fi
     cd ..
+
+    exit #apoWet and apoDry should be functional but are not used at the moment
 
     cd apoWet
      bash ../../../../../scripts/gmx5_setup.sh apoWet
@@ -141,10 +143,10 @@ slurm="#!/bin/bash
 #SBATCH --job-name=$pdb
 #SBATCH -o JEDI2_MDtest.out
 #SBATCH -e JEDI2_MDtest.err
-#SBATCH -p serial 
+#SBATCH -p GTX 
 #SBATCH -n 16 
 #SBATCH -N 1
-##SBATCH --gres=gpu:1 #this line is commented out in the cpu scripts
+#SBATCH --gres=gpu:1 #this line is commented out in the cpu scripts
 #SBATCH --time 48:00:00
 module load gromacs/5.1.4
 "
@@ -152,6 +154,7 @@ module load gromacs/5.1.4
    echo "Processing system $pdb"
    echo "$slurm" > mdsub.sh
    echo "$md" >> mdsub.sh
+   sbatch mdsub.sh
  cd ..
 done
 
